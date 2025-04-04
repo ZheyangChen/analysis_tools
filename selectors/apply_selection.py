@@ -6,17 +6,18 @@ def select_data_with_operators(df, criteria):
     Filter a DataFrame based on a dictionary of selection criteria with comparison operators.
     
     Each key in `criteria` should be a column name. The corresponding value can be:
-      - A single value, in which case an equality check is performed (df[col] == value), or
-      - A tuple (op, value), where op is a string ('>', '<', '>=', '<=', '==', '!=') and 
-        value is the threshold. The appropriate comparison is then applied.
+      - A single value, in which case an equality check is performed (df[col] == value).
+      - A tuple (op, value), where op is a string ('>', '<', '>=', '<=', '==', '!=')
+        and value is the threshold. The appropriate comparison is then applied.
+      - A list of such tuples or values. In that case, conditions are OR-combined for that column.
     
     Parameters
     ----------
     df : pandas.DataFrame
         The input DataFrame to filter.
     criteria : dict
-        Dictionary with keys as column names and values as either a constant or a tuple 
-        (operator, value) for filtering.
+        Dictionary with keys as column names and values as either a constant, a tuple, or
+        a list of constants/tuples for filtering.
         
     Returns
     -------
@@ -42,14 +43,26 @@ def select_data_with_operators(df, criteria):
     mask = pd.Series(True, index=df.index)
     
     for col, cond in criteria.items():
-        if isinstance(cond, tuple) and len(cond) == 2:
+        # If cond is a list, OR all sub-conditions together.
+        if isinstance(cond, list):
+            col_mask = pd.Series(False, index=df.index)
+            for sub_cond in cond:
+                if isinstance(sub_cond, tuple) and len(sub_cond) == 2:
+                    op_str, value = sub_cond
+                    if op_str not in ops:
+                        raise ValueError(f"Operator '{op_str}' is not supported. Choose from {list(ops.keys())}.")
+                    col_mask |= ops[op_str](df[col], value)
+                else:
+                    col_mask |= (df[col] == sub_cond)
+            mask &= col_mask
+        # If cond is a tuple, apply the corresponding operator.
+        elif isinstance(cond, tuple) and len(cond) == 2:
             op_str, value = cond
             if op_str not in ops:
                 raise ValueError(f"Operator '{op_str}' is not supported. Choose from {list(ops.keys())}.")
-            op_func = ops[op_str]
-            mask &= op_func(df[col], value)
+            mask &= ops[op_str](df[col], value)
+        # Otherwise, default to an equality check.
         else:
-            # Default to equality if no operator is specified.
             mask &= (df[col] == cond)
     
     return df[mask]

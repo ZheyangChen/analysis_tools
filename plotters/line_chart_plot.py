@@ -3,10 +3,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 def plot_line_chart(x, y, y_err=None, marker="o", linestyle="-", color=None, label=None,
-                    xscale=None, yscale=None, xlim=None, ylim=None):
+                    ax=None, xscale=None, yscale=None, xlim=None, ylim=None):
     """
     Plot a general-purpose line chart with optional error bands and axis customizations.
-    
+
     Parameters
     ----------
     x : array-like
@@ -23,33 +23,42 @@ def plot_line_chart(x, y, y_err=None, marker="o", linestyle="-", color=None, lab
         Color for the plot. If None, Matplotlib's default color cycle is used.
     label : str, optional
         Label for the plot (for the legend).
+    ax : matplotlib.axes.Axes or None, optional
+        Axis on which to plot. If None, a new figure and axis are created.
     xscale : str or None, optional
-        Scale for the x-axis (e.g., 'linear', 'log').
+        Scale for the x-axis (e.g., 'linear' or 'log').
     yscale : str or None, optional
         Scale for the y-axis.
     xlim : tuple or None, optional
         Limits for the x-axis as (min, max).
     ylim : tuple or None, optional
         Limits for the y-axis as (min, max).
-    
+
     Returns
     -------
-    fig, ax : tuple
-        The matplotlib figure and axes objects.
+    tuple
+        If a new axis is created, returns (fig, ax); if an existing axis is used, returns (None, ax).
     """
-    fig, ax = plt.subplots()
-    
-    # Plot the line; let Matplotlib choose a color if none is provided.
+    new_fig = False
+    if ax is None:
+        fig, ax = plt.subplots()
+        new_fig = True
+    else:
+        fig = None
+
+    # Plot the line. Let matplotlib choose a default color if none is provided.
     if color is None:
         lines = ax.plot(x, y, marker=marker, linestyle=linestyle, label=label)
         actual_color = lines[0].get_color()
     else:
         ax.plot(x, y, marker=marker, linestyle=linestyle, color=color, label=label)
         actual_color = color
-        
+
+    # Plot error bands if y_err is provided.
     if y_err is not None:
         ax.fill_between(x, y - y_err, y + y_err, color=actual_color, alpha=0.3)
-    
+
+    # Set axis scales and limits if provided.
     if xscale is not None:
         ax.set_xscale(xscale)
     if yscale is not None:
@@ -58,14 +67,15 @@ def plot_line_chart(x, y, y_err=None, marker="o", linestyle="-", color=None, lab
         ax.set_xlim(xlim)
     if ylim is not None:
         ax.set_ylim(ylim)
-    
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
+
     if label:
         ax.legend()
-        
-    return fig, ax
 
+    if new_fig:
+        return fig, ax
+    else:
+        return None, ax
+    
 def weighted_stats(values, weights):
     """
     Compute the weighted mean and standard deviation.
@@ -87,93 +97,112 @@ def weighted_stats(values, weights):
     return weighted_mean, np.sqrt(variance)
 
 def plot_difference(df, x_value_name, y_value_reco, y_value_true, 
-                                y_value_name="difference", weight_name="weight",
-                                label="Difference", color=None,
-                                bins=None,
-                                xscale=None, yscale=None, xlim=None, ylim=None,
-                                show=True, save_path=None):
+                             weight_name="weight", labels=None, colors=None,
+                             bins=None, xscale=None, yscale=None, xlim=None, ylim=None,
+                             show=True, save_path=None):
     """
-    Specialized function to plot the weighted difference between two y-values,
-    with customizable binning and axis options.
-    
-    The function computes the absolute difference between y_value_reco and y_value_true,
-    bins the data along x_value_name (using either pre-specified bins or a default),
-    and calculates the weighted mean and standard deviation within each bin.
-    It then calls the general-purpose line chart function to plot the results with error bands.
-    
+    Plot weighted differences for multiple reconstructed y-value columns on one plot.
+
+    For each column in y_value_reco, the function computes the absolute difference
+    with the true value, bins the data along x_value_name, computes the weighted mean
+    and standard deviation in each bin, and then plots the results with error bands.
+
     Parameters
     ----------
     df : pandas.DataFrame
         Input DataFrame.
     x_value_name : str
-        Column name for x-axis values (used for binning).
-    y_value_reco : str
-        Column name for the reconstructed y-values.
+        Column name for the x-axis (used for binning).
+    y_value_reco : list or str
+        List of column names for the reconstructed y-values. If a single string is provided,
+        it will be converted to a list.
     y_value_true : str
         Column name for the true y-values.
-    y_value_name : str, optional
-        Column name for the computed difference (defaults to "difference").
     weight_name : str, optional
-        Column name for weights (defaults to "weight").
-    label : str, optional
-        Label for the plot (defaults to "Difference").
-    color : str or None, optional
-        Color for the plot. If None, Matplotlib's default color is used.
+        Column name for the weight values (default is "weight").
+    labels : list or str, optional
+        Labels for each dataset. If not provided, defaults to "Difference <col>".
+    colors : list or str, optional
+        Colors for each dataset. If a single string or None is provided, it is replicated.
     bins : array-like or None, optional
         Pre-specified bins for the x-axis. If None, defaults to np.logspace(2, 8, 20).
     xscale : str or None, optional
-        Scale for the x-axis (e.g., 'linear', 'log').
+        Scale for the x-axis.
     yscale : str or None, optional
         Scale for the y-axis.
     xlim : tuple or None, optional
-        Limits for the x-axis as (min, max).
+        x-axis limits as (min, max).
     ylim : tuple or None, optional
-        Limits for the y-axis as (min, max).
+        y-axis limits as (min, max).
     show : bool, default True
         Whether to display the plot.
     save_path : str or None, optional
         If provided, the plot is saved to this path.
-    
+
     Returns
     -------
     fig, ax : tuple
         The matplotlib figure and axes objects.
     """
-    # Work on a copy of the DataFrame.
-    df_copy = df.copy()
-    
-    # Compute the absolute difference.
-    df_copy[y_value_name] = np.abs(df_copy[y_value_reco] - df_copy[y_value_true])
-    
-    # Use provided bins, or compute default bins.
+    # Ensure y_value_reco is a list.
+    if not isinstance(y_value_reco, list):
+        y_value_reco = [y_value_reco]
+    n = len(y_value_reco)
+
+    # Process labels.
+    if labels is None:
+        labels = [f"Difference {col}" for col in y_value_reco]
+    elif isinstance(labels, str):
+        labels = [labels] * n
+    elif len(labels) != n:
+        raise ValueError("Length of labels must equal length of y_value_reco list.")
+
+    # Process colors.
+    if colors is None:
+        colors = [None] * n
+    elif isinstance(colors, str):
+        colors = [colors] * n
+    elif len(colors) != n:
+        raise ValueError("Length of colors must equal length of y_value_reco list.")
+
+    # Use provided bins or default to np.logspace(2, 8, 20).
     if bins is None:
         bins = np.logspace(2, 8, 20)
-    
-    # Bin the x values.
-    df_copy['x_bin'] = pd.cut(df_copy[x_value_name], bins=bins, labels=False)
-    
-    # Compute weighted statistics per bin.
-    results = df_copy.groupby("x_bin").apply(
-        lambda group: weighted_stats(group[y_value_name], group[weight_name])
-    ).reindex(range(len(bins) - 1), fill_value=(np.nan, np.nan))
-    
-    weighted_means = results.map(lambda x: x[0])
-    weighted_std_devs = results.map(lambda x: x[1])
-    valid = ~np.isnan(weighted_means)
-    
-    # Calculate bin centers.
     x_centers = (bins[:-1] + bins[1:]) / 2
-    
-    # Plot using the general-purpose line chart function.
-    fig, ax = plot_line_chart(x_centers[valid], weighted_means[valid],
-                              y_err=weighted_std_devs[valid],
-                              marker="o", linestyle="-", color=color, label=label,
-                              xscale=xscale, yscale=yscale, xlim=xlim, ylim=ylim)
-    
+
+    # Create one figure and axis.
+    fig, ax = plt.subplots()
+
+    # Loop over each reconstructed y-value column.
+    for i, col in enumerate(y_value_reco):
+        # Compute the absolute difference for this column.
+        diff = np.abs(df[col] - df[y_value_true])
+        temp = pd.DataFrame({
+            x_value_name: df[x_value_name],
+            "difference": diff,
+            "weight": df[weight_name]
+        })
+        # Bin the data.
+        temp["x_bin"] = pd.cut(temp[x_value_name], bins=bins, labels=False)
+        # Compute weighted statistics for each bin.
+        results = temp.groupby("x_bin").apply(
+            lambda group: weighted_stats(group["difference"], group["weight"])
+        ).reindex(range(len(bins) - 1), fill_value=(np.nan, np.nan))
+        weighted_means = results.map(lambda x: x[0])
+        weighted_std_devs = results.map(lambda x: x[1])
+        valid = ~np.isnan(weighted_means)
+        # Plot on the existing axis.
+        plot_line_chart(x_centers[valid], weighted_means[valid],
+                        y_err=weighted_std_devs[valid],
+                        marker="o", linestyle="-", color=colors[i], label=labels[i],
+                        ax=ax, xscale=xscale, yscale=yscale, xlim=xlim, ylim=ylim)
+
+    # Set overall axis labels and title.
     ax.set_xlabel(x_value_name)
-    ax.set_ylabel(y_value_name)
+    ax.set_ylabel("Difference")
     ax.set_title("Difference Plot")
-    
+    ax.legend()
+
     plt.tight_layout()
     if save_path:
         plt.savefig(save_path)
@@ -181,7 +210,6 @@ def plot_difference(df, x_value_name, y_value_reco, y_value_true,
         plt.show()
     else:
         plt.close()
-    
     return fig, ax
 
 # Example usage:
@@ -189,16 +217,21 @@ if __name__ == '__main__':
     np.random.seed(0)
     N = 1000
     df_example = pd.DataFrame({
-        'energy': np.random.uniform(100, 1000, N),
-        'reco': np.random.normal(50, 10, N),
-        'true': np.random.normal(50, 10, N),
+        'MCTruth_Cascade_Distance_value': np.random.uniform(100, 1000, N),
+        'Taupede_spice3_Distance_value': np.random.normal(50, 10, N),
         'weight': np.random.rand(N)
     })
+
+    # For a single reconstructed column (even as a list)
+    Taupede_name_list = ['Taupede_spice3']
+    suffix = "_Distance_value"
+    y_value_reco = [item + suffix for item in Taupede_name_list]
+    y_value_true = 'MCTruth_Cascade_Distance_value'
     
-    # Example: Specify bins using np.linspace.
-    custom_bins = np.linspace(100, 1000, 20)
-    plot_difference(df_example, x_value_name='energy', 
-                                y_value_reco='reco', y_value_true='true',
-                                bins=custom_bins,
-                                xscale='linear', yscale='linear', 
-                                xlim=(100, 1000), ylim=(0, 30))
+    # Plot multiple differences on one plot.
+    plot_difference(df_example, 
+                             x_value_name='MCTruth_Cascade_Distance_value', 
+                             y_value_reco=y_value_reco, 
+                             y_value_true=y_value_true,
+                             xscale='linear', yscale='linear',
+                             xlim=(100, 1000), ylim=(0, 30))

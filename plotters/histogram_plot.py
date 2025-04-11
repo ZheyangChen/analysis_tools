@@ -10,7 +10,7 @@ from math import sqrt
 def plot_histograms(data_input, plotvar, bins, weights_map='weight', normalized=False,
                     histtype='step', xscale=None, yscale='log',
                     xlabel=None, ylabel=None, title=None,
-                    legend_loc='best', show=True, save_path=None):
+                    legend_loc='best',xlim=None, ylim=None,colors=None, show=True, save_path=None):
     """
     Plot histograms for one or multiple datasets on a single figure.
     
@@ -79,12 +79,17 @@ def plot_histograms(data_input, plotvar, bins, weights_map='weight', normalized=
             weights = df[weights_spec]
         
         plt.hist(df[plotvar], bins=bins, histtype=histtype,
-                 weights=weights, density=normalized, label=label)
+                 weights=weights, density=normalized, label=label,color=colors)
     
     if xscale:
         plt.xscale(xscale)
     if yscale:
         plt.yscale(yscale)
+        
+    if xlim:
+        plt.xlim(xlim)
+    if ylim:
+        plt.ylim(ylim)
     
     plt.xlabel(xlabel if xlabel else plotvar)
     # Adjust y-axis label based on normalized flag.

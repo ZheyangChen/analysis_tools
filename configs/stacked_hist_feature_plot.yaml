@@ -1,0 +1,255 @@
+# plot_config.yaml
+common:
+  prefix: "Taupede_spice3"
+  xscale: "linear"
+  yscale: "log"
+  ylabel: "Rate per year"
+  legend_loc: "best"
+  weights_map: "weight"
+  normalized: false
+  #histtype: "step"
+  #save_path: "output/histogram.png"  # If you want to save, adjust the path as needed
+  show: true
+  hist_weight: "weight"
+  errorbar_weight: "weight"
+  colors: ['b','y','g']
+  ylabel_ratio: "MC/Data Ratio"
+
+
+plot_type: stacked_hist_with_ratio
+
+variables:
+  MonopodE:
+    column: "cscdSBU_MonopodFit4_noDC_energy"            # Data column to plot
+    bins:
+      function: logspace
+      start: 2
+      stop: 8
+      num: 30
+    xlabel: "Energy[GeV]"
+    title: "Monopod Energy"
+    xscale: "log"
+    
+  TaupedeAsymmetry:
+    column: "Taupede_Asymmetry_value"
+    bins:
+      function: linspace
+      start: -1
+      stop: 1
+      num: 30
+    xlabel: "Asymmetry"
+    title: "Taupede Asymmetry"
+    legend_loc: "upper left"
+    
+  Taupede1Energy:
+    column: "Taupede1_spice3Particles_energy"
+    bins:
+      function: logspace
+      start: 2
+      stop: 8
+      num: 30
+    xlabel: "Energy[GeV]"
+    title: "Taupede 1st Cascade Energy"
+    xscale: "log"
+
+
+  Taupede2Energy:
+    column: "Taupede2_spice3Particles_energy"
+    bins:
+      function: logspace
+      start: 2
+      stop: 8
+      num: 30
+    xlabel: "Energy[GeV]"
+    title: "Taupede 2nd Cascade Energy"
+    xscale: "log"
+
+  TaupedeDistance:
+    column: "Taupede_Distance_value"
+    bins:
+      function: linspace
+      start: 0
+      stop: 100
+      num: 30
+    xlabel: "Length[m]"
+    title: "Taupede Cascade Distance"
+
+  TauMonorlogldiff:
+    column: "TauMonoDiff_rlogl"
+    bins:
+      function: linspace
+      start: -2
+      stop: 0.5
+      num: 30
+    xlabel: "Difference"
+    title: "Taupede Monopod rlogl difference"
+    
+  Taupedenmini:
+    column: "{prefix}FitParams_nmini"
+    bins:
+      function: linspace
+      start: 0
+      stop: 400
+      num: 30
+    xlabel: "nmini"
+    title: "Taupede nmini"
+    
+    
+  Totalcharge:
+    column: "cscdSBU_LE_bdt_input_cscdSBU_Qtot_HLC_log_value"
+    bins:
+      function: linspace
+      start: 2
+      stop: 6.5
+      num: 30
+    xlabel: "Charge"
+    title: "Total Charge"
+    
+    
+  CascadeLlhVertexFitParams_rlogL:
+    column: "cscdSBU_LE_bdt_input_CascadeLlhVertexFitParams_rlogL"
+    bins:
+      function: linspace
+      start: 6
+      stop: 10
+      num: 30
+    xlabel: "rlogl"
+    title: "CascadeLlhVertexFitParams_rlogL"    
+    
+  CscdL3_SPEFit16FitParams_rlogl:
+    column: "cscdSBU_LE_bdt_input_CscdL3_SPEFit16FitParams_rlogl"
+    bins:
+      function: linspace
+      start: 6.5
+      stop: 11.5
+      num: 30
+    xlabel: "rlogl"
+    title: "CscdL3_SPEFit16FitParams_rlogl"       
+    
+  CscdL3_SPEFit16_zenith:
+    column: "cscdSBU_LE_bdt_input_CscdL3_SPEFit16_zenith"
+    bins:
+      function: linspace
+      start: 0
+      stop: 3.15
+      num: 30
+    xlabel: "zenith"
+    title: "CscdL3_SPEFit16FitParams_rlogl"         
+    
+  LineFit_zenith:
+    column: "cscdSBU_LE_bdt_input_LineFit_zenith"
+    bins:
+      function: linspace
+      start: 0
+      stop: 3.15
+      num: 30
+    xlabel: "zenith"
+    title: "LineFit_zenith"  
+    
+  cscdSBU_I3XYScale_noDC_value:
+    column: "cscdSBU_LE_bdt_input_cscdSBU_I3XYScale_noDC_value"
+    bins:
+      function: linspace
+      start: 0
+      stop: 1
+      num: 30
+    xlabel: "XY scale"
+    title: "cscdSBU_I3XYScale_noDC_value"  
+    
+  cscdSBU_L4StartingTrackHLC_cscdSBU_MonopodFit4_noDCVetoCharge_value:
+    column: "cscdSBU_LE_bdt_input_cscdSBU_L4StartingTrackHLC_cscdSBU_MonopodFit4_noDCVetoCharge_value"
+    bins:
+      function: linspace
+      start: 0
+      stop: 20
+      num: 30
+    xlabel: "VetoCharge"
+    title: "cscdSBU_L4StartingTrackHLC_cscdSBU_MonopodFit4_noDCVetoCharge_value"  
+    
+  cscdSBU_L4VetoTrack_cscdSBU_MonopodFit4_noDCVetoCharge_value:
+    column: "cscdSBU_LE_bdt_input_cscdSBU_L4VetoTrack_cscdSBU_MonopodFit4_noDCVetoCharge_value"
+    bins:
+      function: linspace
+      start: 0
+      stop: 20
+      num: 30
+    xlabel: "VetoCharge"
+    title: "cscdSBU_L4VetoTrack_cscdSBU_MonopodFit4_noDCVetoCharge_value"  
+
+    
+  cscdSBU_MonopodFit4_noDC_Delay_ice_value:
+    column: "cscdSBU_LE_bdt_input_cscdSBU_MonopodFit4_noDC_Delay_ice_value"
+    bins:
+      function: linspace
+      start: -1000
+      stop: 100
+      num: 30
+    xlabel: "Delay_ice_value"
+    title: "cscdSBU_MonopodFit4_noDC_Delay_ice_value"  
+
+  cscdSBU_MonopodFit4_noDC_z:
+    column: "cscdSBU_LE_bdt_input_cscdSBU_MonopodFit4_noDC_z"
+    bins:
+      function: linspace
+      start: -500
+      stop: 500
+      num: 30
+    xlabel: "z"
+    title: "cscdSBU_MonopodFit4_noDC_z"  
+
+  cscdSBU_MonopodFit4_noDC_zenith:
+    column: "cscdSBU_LE_bdt_input_cscdSBU_MonopodFit4_noDC_zenith"
+    bins:
+      function: linspace
+      start: 0
+      stop: 3.15
+      num: 30
+    xlabel: "zenith"
+    title: "cscdSBU_MonopodFit4_noDC_zenith" 
+
+  cscdSBU_VertexRecoDist_CscdLLh:
+    column: "cscdSBU_LE_bdt_input_cscdSBU_VertexRecoDist_CscdLLh"
+    bins:
+      function: linspace
+      start: 0
+      stop: 120
+      num: 30
+    xlabel: "RecoDist"
+    title: "cscdSBU_VertexRecoDist_CscdLLh" 
+
+  cscdSBU_VetoDepthFirstHit_value:
+    column: "cscdSBU_LE_bdt_input_cscdSBU_VetoDepthFirstHit_value"
+    bins:
+      function: linspace
+      start: -500
+      stop: 500
+      num: 30
+    xlabel: "Depth"
+    title: "cscdSBU_VetoDepthFirstHit_value" 
+
+  q_max_doms:
+    column: "CVStatistics_q_max_doms"
+    bins:
+      function: linspace
+      start: 0
+      stop: 100
+      num: 30
+    xlabel: "CVStatistics_q_max_doms"
+    title: "q_max_doms" 
+
+  z_travel:
+    column: "CVStatistics_z_travel"
+    bins:
+      function: linspace
+      start: 0
+      stop: 100
+      num: 30
+    xlabel: "CVStatistics_z_travel"
+    title: "z_travel" 
+
+
+
+
+
+
+

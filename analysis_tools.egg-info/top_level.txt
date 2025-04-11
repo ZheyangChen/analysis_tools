@@ -1,4 +1,1 @@
-calculators
-jobs
-my_selectors
-plotters
+analysis_tools

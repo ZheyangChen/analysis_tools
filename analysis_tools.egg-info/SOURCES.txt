@@ -1,6 +1,7 @@
 README.md
 setup.py
 analysis_tools/__init__.py
+analysis_tools/main.py
 analysis_tools/utils.py
 analysis_tools.egg-info/PKG-INFO
 analysis_tools.egg-info/SOURCES.txt

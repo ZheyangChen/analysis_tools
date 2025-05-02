@@ -5,115 +5,147 @@ import pandas as pd
 import matplotlib.gridspec as gridspec
 from math import sqrt
 
-
-
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from typing import Sequence, Union, Dict, Any
 
-def plot_histograms(data_input, plotvar, bins,
-                    weights_map='weight', normalized=False, histtype='step',
-                    xscale=None, yscale='log',
-                    xlabel=None, ylabel=None, title=None,
-                    legend_loc='best', xlim=None, ylim=None,
-                    colors=None, labels=None,
-                    show=True, save_path=None):
+
+def plot_histograms(
+    data_input: Union[pd.DataFrame, Sequence[pd.DataFrame], Dict[str,pd.DataFrame]],
+    plotvar: Union[str, Sequence[str]],
+    bins,
+    weights_map: Union[str, Dict[str,str]] = 'weight',
+    normalized: bool = False,
+    histtype: str = 'step',
+    xscale: str = None,
+    yscale: str = 'log',
+    xlabel: str = None,
+    ylabel: str = None,
+    title: str = None,
+    legend_loc: str = 'best',
+    xlim: tuple = None,
+    ylim: tuple = None,
+    colors: Union[str, Sequence[str]] = None,
+    labels: Sequence[str] = None,
+
+    # << NEW >>
+    ax: plt.Axes = None,
+    vlines: Sequence[float] = None,
+    hlines: Sequence[float] = None,
+    vline_kwargs: Dict[str,Any] = None,
+    hline_kwargs: Dict[str,Any] = None,
+    show: bool = True,
+    save_path: str = None
+) -> plt.Axes:
     """
     Two modes:
-      • Multi‑DF mode: data_input=dict/list of DataFrames, plotvar=str
-      • Multi‑column mode: data_input=DataFrame, plotvar=list of str
+      • Multi-DF mode: data_input=dict/list of DataFrames, plotvar=str
+      • Multi-column mode: data_input=DataFrame, plotvar=list of str
 
-    Parameters
-    ----------
-    data_input : dict of DataFrames, list of DataFrames, or single DataFrame
-    plotvar    : str or list of str
-    bins       : array-like
-    weights_map: str or dict (in multi‑DF mode)
-    colors     : single matplotlib color or list of colors
-    labels     : legend labels (list of same length as histograms)
+    New features:
+      • ax=...: plot into an existing Axes (returns that Axes)
+      • vlines / hlines: list of x/y positions to draw axvline()/axhline()
+      • vline_kwargs / hline_kwargs: kwargs passed to those calls
     """
-    # --- Figure out which mode we're in ---
+    # — Figure out data & columns (unchanged) —
     if isinstance(data_input, dict) or isinstance(data_input, list):
-        # Multi‑DF mode: plotvar must be a single column name
         if isinstance(data_input, list):
             data_dict = {f'df_{i}': df for i, df in enumerate(data_input)}
         else:
             data_dict = data_input
-
         if isinstance(plotvar, (list, tuple)):
             raise ValueError("When data_input is dict/list, plotvar must be a single column name.")
-
         dfs      = [data_dict[k] for k in data_dict]
         plotvars = [plotvar] * len(dfs)
-        # default labels = dict keys or df_i
         if labels is None:
             labels = list(data_dict.keys())
 
     elif isinstance(data_input, pd.DataFrame):
-        # Single-DF mode: plotvar can be str or list
         if isinstance(plotvar, (list, tuple)):
             dfs      = [data_input] * len(plotvar)
             plotvars = list(plotvar)
             if labels is None:
-                labels = list(plotvar)
+                labels = plotvar
         else:
             dfs      = [data_input]
             plotvars = [plotvar]
             if labels is None:
                 labels = [plotvar]
     else:
-        raise ValueError("data_input must be a DataFrame, a list of DataFrames, or a dict of DataFrames.")
+        raise ValueError("data_input must be a DataFrame, list or dict of DataFrames")
 
     n = len(dfs)
 
-    # --- Normalize colors and labels ---
+    # — Normalize colors & labels —
     if colors is None:
-        colors = [None] * n
-    elif not isinstance(colors, (list, tuple)):
-        colors = [colors] * n
+        colors = [None]*n
+    elif isinstance(colors, str):
+        colors = [colors]*n
     elif len(colors) != n:
-        raise ValueError(f"You passed {len(colors)} colors for {n} histograms.")
+        raise ValueError(f"{n} histograms but {len(colors)} colors")
 
     if labels is None or len(labels) != n:
-        raise ValueError(f"You must provide exactly {n} labels for the legend.")
+        raise ValueError(f"Must provide exactly {n} labels")
 
-    # --- Plotting ---
-    plt.figure()
-    for df, var, color, lab in zip(dfs, plotvars, colors, labels):
-        # determine weights
+    # — Set up Axes —
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = ax.figure
+
+    # — Plot histograms —
+    for df, var, col, lab in zip(dfs, plotvars, colors, labels):
         if isinstance(weights_map, str):
             w = df[weights_map]
         else:
             wspec = weights_map.get(lab)
             if wspec is None:
-                raise ValueError(f"No weight specification for label '{lab}'.")
+                raise ValueError(f"No weight for label {lab!r}")
             w = df[wspec].sum(axis=1) if isinstance(wspec, list) else df[wspec]
 
-        plt.hist(df[var], bins=bins, histtype=histtype,
-                 weights=w, density=normalized,
-                 color=color, label=lab)
+        ax.hist(
+            df[var],
+            bins=bins,
+            histtype=histtype,
+            weights=w,
+            density=normalized,
+            color=col,
+            label=lab
+        )
 
-    if xscale: plt.xscale(xscale)
-    if yscale: plt.yscale(yscale)
-    if xlim:   plt.xlim(xlim)
-    if ylim:   plt.ylim(ylim)
+    # — Scales & limits —
+    if xscale: ax.set_xscale(xscale)
+    if yscale: ax.set_yscale(yscale)
+    if xlim:   ax.set_xlim(xlim)
+    if ylim:   ax.set_ylim(ylim)
 
-    # axis labels & title
+    # — Labels & legend —
     is_multi = len(plotvars) > 1
-    plt.xlabel(xlabel or ( "" if is_multi else plotvars[0] ))
+    ax.set_xlabel(xlabel or ("" if is_multi else plotvars[0]))
     default_ylabel = 'Probability Density' if normalized else 'Rate per Year'
-    plt.ylabel(ylabel or default_ylabel)
-    plt.title(title or "")
+    ax.set_ylabel(ylabel or default_ylabel)
+    ax.set_title(title or "")
+    ax.legend(loc=legend_loc)
 
-    plt.legend(loc=legend_loc)
+    # — Optional v/h lines —
+    vline_kwargs = vline_kwargs or {}
+    hline_kwargs = hline_kwargs or {}
+    if vlines:
+        for x in vlines:
+            ax.axvline(x, **vline_kwargs)
+    if hlines:
+        for y in hlines:
+            ax.axhline(y, **hline_kwargs)
 
+    # — Save / Show —
     if save_path:
-        plt.savefig(save_path)
+        fig.savefig(save_path)
     if show:
         plt.show()
-    else:
-        plt.close()
-        
+
+    return ax
+
 
 def compute_hist_with_errors(data, bins, weight, transform_func=None):
     """

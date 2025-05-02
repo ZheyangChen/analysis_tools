@@ -96,120 +96,143 @@ def weighted_stats(values, weights):
     variance = np.average((values - weighted_mean) ** 2, weights=weights)
     return weighted_mean, np.sqrt(variance)
 
-def plot_difference(df, x_value_name, y_value_reco, y_value_true, 
-                             weight_name="weight", labels=None, colors=None,
-                             bins=None, xscale=None, yscale=None, xlim=None, ylim=None,
-                             show=True, save_path=None):
+def plot_difference(data_input,
+                    x_value_name,
+                    y_value_reco,
+                    y_value_true,
+                    weight_name="weight",
+                    labels=None,
+                    colors=None,
+                    bins=None,
+                    xscale=None,
+                    yscale=None,
+                    xlim=None,
+                    ylim=None,
+                    show=True,
+                    save_path=None):
     """
-    Plot weighted differences for multiple reconstructed y-value columns on one plot.
-
-    For each column in y_value_reco, the function computes the absolute difference
-    with the true value, bins the data along x_value_name, computes the weighted mean
-    and standard deviation in each bin, and then plots the results with error bands.
+    Plot weighted differences for one or more datasets and one or more reconstructed columns.
 
     Parameters
     ----------
-    df : pandas.DataFrame
-        Input DataFrame.
+    data_input : pd.DataFrame or list of DataFrames or dict of DataFrames
+        If DataFrame: behaves as before.
+        If list:  will be auto‐labeled "df_0", "df_1", …
+        If dict:  keys are used as dataset labels.
     x_value_name : str
         Column name for the x-axis (used for binning).
-    y_value_reco : list or str
-        List of column names for the reconstructed y-values. If a single string is provided,
-        it will be converted to a list.
+    y_value_reco : str or list of str
+        Column(s) for reconstructed y-values.
     y_value_true : str
-        Column name for the true y-values.
-    weight_name : str, optional
-        Column name for the weight values (default is "weight").
-    labels : list or str, optional
-        Labels for each dataset. If not provided, defaults to "Difference <col>".
-    colors : list or str, optional
-        Colors for each dataset. If a single string or None is provided, it is replicated.
-    bins : array-like or None, optional
-        Pre-specified bins for the x-axis. If None, defaults to np.logspace(2, 8, 20).
-    xscale : str or None, optional
-        Scale for the x-axis.
-    yscale : str or None, optional
-        Scale for the y-axis.
-    xlim : tuple or None, optional
-        x-axis limits as (min, max).
-    ylim : tuple or None, optional
-        y-axis limits as (min, max).
-    show : bool, default True
-        Whether to display the plot.
-    save_path : str or None, optional
-        If provided, the plot is saved to this path.
-
-    Returns
-    -------
-    fig, ax : tuple
-        The matplotlib figure and axes objects.
+        Column name for the true y-value.
+    weight_name : str
+    labels : list of str, optional
+        One label per curve.  Defaults to "<dataset>: Difference <col>".
+    colors : list of colors or single color, optional
+    bins : array-like, optional
+        Defaults to np.logspace(2, 8, 20).
+    (…rest as before…)
     """
-    # Ensure y_value_reco is a list.
-    if not isinstance(y_value_reco, list):
+    # --- Normalize data_input to a dict of DataFrames ---
+    if isinstance(data_input, pd.DataFrame):
+        data_dict = {"": data_input}
+    elif isinstance(data_input, list):
+        data_dict = {f"df_{i}": df for i, df in enumerate(data_input)}
+    elif isinstance(data_input, dict):
+        data_dict = data_input
+    else:
+        raise ValueError("data_input must be DataFrame, list, or dict of DataFrames")
+
+    # --- Normalize y_value_reco to a list ---
+    if isinstance(y_value_reco, str):
         y_value_reco = [y_value_reco]
-    n = len(y_value_reco)
+    n_vars = len(y_value_reco)
+    n_data = len(data_dict)
+    total_curves = n_data * n_vars
 
-    # Process labels.
-    if labels is None:
-        labels = [f"Difference {col}" for col in y_value_reco]
-    elif isinstance(labels, str):
-        labels = [labels] * n
-    elif len(labels) != n:
-        raise ValueError("Length of labels must equal length of y_value_reco list.")
-
-    # Process colors.
-    if colors is None:
-        colors = [None] * n
-    elif isinstance(colors, str):
-        colors = [colors] * n
-    elif len(colors) != n:
-        raise ValueError("Length of colors must equal length of y_value_reco list.")
-
-    # Use provided bins or default to np.logspace(2, 8, 20).
+    # --- Default bins ---
     if bins is None:
         bins = np.logspace(2, 8, 20)
     x_centers = (bins[:-1] + bins[1:]) / 2
 
-    # Create one figure and axis.
+    # --- Build default labels if needed ---
+    default_labels = []
+    for dlabel in data_dict:
+        for col in y_value_reco:
+            prefix = f"{dlabel}: " if dlabel else ""
+            default_labels.append(f"{prefix}Difference {col}")
+
+    if labels is None:
+        labels = default_labels
+    elif isinstance(labels, str):
+        labels = [labels] * total_curves
+    elif len(labels) != total_curves:
+        raise ValueError(f"labels must have length {total_curves}")
+
+    # --- Build default colors list ---
+    if colors is None:
+        colors = [None] * total_curves
+    elif not isinstance(colors, (list, tuple)):
+        colors = [colors] * total_curves
+    elif len(colors) != total_curves:
+        raise ValueError(f"colors must have length {total_curves}")
+
+    # --- Plotting setup ---
     fig, ax = plt.subplots()
+    curve_idx = 0
 
-    # Loop over each reconstructed y-value column.
-    for i, col in enumerate(y_value_reco):
-        # Compute the absolute difference for this column.
-        diff = np.abs(df[col] - df[y_value_true])
-        temp = pd.DataFrame({
-            x_value_name: df[x_value_name],
-            "difference": diff,
-            "weight": df[weight_name]
-        })
-        # Bin the data.
-        temp["x_bin"] = pd.cut(temp[x_value_name], bins=bins, labels=False)
-        # Compute weighted statistics for each bin.
-        results = temp.groupby("x_bin").apply(
-            lambda group: weighted_stats(group["difference"], group["weight"])
-        ).reindex(range(len(bins) - 1), fill_value=(np.nan, np.nan))
-        weighted_means = results.map(lambda x: x[0])
-        weighted_std_devs = results.map(lambda x: x[1])
-        valid = ~np.isnan(weighted_means)
-        # Plot on the existing axis.
-        plot_line_chart(x_centers[valid], weighted_means[valid],
-                        y_err=weighted_std_devs[valid],
-                        marker="o", linestyle="-", color=colors[i], label=labels[i],
-                        ax=ax, xscale=xscale, yscale=yscale, xlim=xlim, ylim=ylim)
+    for dlabel, df in data_dict.items():
+        for col in y_value_reco:
+            # compute absolute difference
+            diff = np.abs(df[col] - df[y_value_true])
+            temp = pd.DataFrame({
+                x_value_name: df[x_value_name],
+                "difference": diff,
+                "weight": df[weight_name]
+            })
+            # bin and compute weighted stats
+            temp["x_bin"] = pd.cut(temp[x_value_name], bins=bins, labels=False)
+            results = (
+                temp
+                .groupby("x_bin")
+                .apply(lambda g: weighted_stats(g["difference"], g["weight"]))
+                .reindex(range(len(bins)-1), fill_value=(np.nan, np.nan))
+            )
+            means = results.map(lambda t: t[0])
+            stds  = results.map(lambda t: t[1])
+            valid = ~np.isnan(means)
 
-    # Set overall axis labels and title.
+            # plot_line_chart handles errorbars and scales
+            plot_line_chart(
+                x_centers[valid],
+                means[valid],
+                y_err=stds[valid],
+                marker="o",
+                linestyle="-",
+                color=colors[curve_idx],
+                label=labels[curve_idx],
+                ax=ax,
+                xscale=xscale,
+                yscale=yscale,
+                xlim=xlim,
+                ylim=ylim
+            )
+            curve_idx += 1
+
+    # final formatting
     ax.set_xlabel(x_value_name)
     ax.set_ylabel("Difference")
     ax.set_title("Difference Plot")
-    ax.legend()
-
+    ax.legend(loc="best")
     plt.tight_layout()
+
     if save_path:
-        plt.savefig(save_path)
+        fig.savefig(save_path)
     if show:
         plt.show()
     else:
-        plt.close()
+        plt.close(fig)
+
     return fig, ax
 
 # Example usage:

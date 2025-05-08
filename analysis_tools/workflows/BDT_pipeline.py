@@ -1,4 +1,4 @@
-# file: analysis_tools/workflows/pipeline.py
+# file: analysis_tools/workflows/BDT_pipeline.py
 
 import os
 import joblib
@@ -12,7 +12,7 @@ from analysis_tools.BDT_tools.Testset_preparation   import annotate_labels
 from analysis_tools.calculators.event_rates          import compute_rate
 from analysis_tools.plotters.histogram_plot          import plot_histograms
 from analysis_tools.BDT_tools.BDT_evaluation         import plot_bdt_threshold_scan
-from analysis_tools.BDT_tools.BDT_training           import model_training
+from analysis_tools.BDT_tools.BDT_training           import model_training,plot_feature_importances
 from analysis_tools.workflows.evaluation_flow        import evaluation_flow
 
 
@@ -93,13 +93,24 @@ def run_bdt_pipeline(
 
         # 3) Train & save model in one shot
         save_path = os.path.join(train_outdir, f"{name}_model.pkl")
-        model = model_training(
+        model     = model_training(
             df2[features + ['label']],
             save_path=save_path
         )
         trained_models[name] = model
-
         print(f"Trained {name}, saved to {save_path}")
+
+        # — NEW: plot & save feature importances —
+        fi_path = os.path.join(train_outdir, f"{name}_importances.png")
+        plot_feature_importances(
+            model,
+            feature_names=features,
+            top_n=len(features),
+            title=f"{name} Feature Importances",
+            save_path=fi_path
+        )
+        print(f"Saved feature importances to {fi_path}")
+
 
     # 4) Evaluate all trained models together
     # Prepare score labels in eval_tag

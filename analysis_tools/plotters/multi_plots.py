@@ -4,15 +4,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from analysis_tools.plotters.histogram_plot import plot_histograms, plot_stacked_hist_with_ratio
-from analysis_tools.utils import generate_bins
+from analysis_tools.utils.utils import generate_bins
 
-import yaml
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
-
-from analysis_tools.plotters.histogram_plot import plot_histograms, plot_stacked_hist_with_ratio
-from analysis_tools.utils import generate_bins
 
 def plot_multi_var(df, config, errorbar_data=None):
     """

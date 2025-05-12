@@ -144,7 +144,7 @@ def plot_histograms(
     if show:
         plt.show()
 
-    return ax
+    #return ax
 
 
 def compute_hist_with_errors(data, bins, weight, transform_func=None):

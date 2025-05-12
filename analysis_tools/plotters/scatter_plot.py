@@ -1,108 +1,73 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
-import pandas as pd
+from matplotlib.colors import LogNorm, Normalize
+
 
 def scatter_plot(plot_df, x, y, bins, cuts=None, weight='weight',
-                   xscale=None, yscale=None, cmap='viridis',
-                   show_line=False, line_color='r', line_label=None,
-                   xlabel=None, ylabel=None, title=None, colorbar_label=None,
-                   legend_loc='best'):
+                 xscale=None, yscale=None, cmap='viridis',
+                 color_scale: str = 'log',      # 'log' or 'linear'
+                 show_line=False, line_color='r', line_label=None,
+                 xlabel=None, ylabel=None, title=None,
+                 colorbar_label=None, legend_loc='best'):
     """
-    Create a 2D histogram (scatter-like plot) with an optional reference line.
-    
-    Parameters
-    ----------
-    plot_df : pandas.DataFrame
-        DataFrame containing the data.
-    x : str
-        Column name for the x-axis.
-    y : str
-        Column name for the y-axis.
-    bins : int or sequence
-        Number of bins or array of bin edges to use in both dimensions.
-    cuts : array-like of bool, optional
-        Boolean mask to filter the DataFrame. If None, no filtering is applied.
-    weight : str, default 'weight'
-        Column name for weights.
-    xscale : str or None
-        Scale for the x-axis (e.g., 'linear' or 'log').
-    yscale : str or None
-        Scale for the y-axis.
-    cmap : str, default 'viridis'
-        Colormap for the 2D histogram.
-    show_line : bool, default False
-        If True, plot a reference line (default is y=x).
-    line_color : str, default 'r'
-        Color for the reference line.
-    line_label : str or None
-        Label for the reference line in the legend.
-    xlabel : str or None
-        X-axis label; defaults to the x column name.
-    ylabel : str or None
-        Y-axis label; defaults to the y column name.
-    title : str or None
-        Plot title.
-    colorbar_label : str or None
-        Label for the colorbar.
-    legend_loc : str, default 'best'
-        Location for the legend.
-    
-    Returns
-    -------
-    None
+    Create a 2D histogram (scatter-like plot) with optional reference line
+    and either a logarithmic or linear colorbar.
+
+    Returns (fig, ax) so you can further customize if needed.
     """
-    # If no cuts provided, create a mask that selects all rows.
-    if cuts is not None:
-        mask = cuts
+    # 1) Mask
+    mask = cuts if cuts is not None else np.ones(len(plot_df), dtype=bool)
+
+    # 2) Choose norm
+    if color_scale == 'log':
+        norm = LogNorm()
+    elif color_scale == 'linear':
+        norm = Normalize()
     else:
-        mask = np.ones(len(plot_df), dtype=bool)
-    
-    # Create figure and axis.
+        raise ValueError("color_scale must be 'log' or 'linear'")
+
+    # 3) Draw
     fig, ax = plt.subplots()
-    
-    # Create the 2D histogram.
-    h = ax.hist2d(plot_df.loc[mask, x], plot_df.loc[mask, y],
-                  bins=bins, weights=plot_df.loc[mask, weight],
-                  norm=LogNorm(), cmap=cmap)
-    
-    # Optionally plot a reference line (e.g., y=x).
+    counts, xedges, yedges, image = ax.hist2d(
+        plot_df.loc[mask, x],
+        plot_df.loc[mask, y],
+        bins=bins,
+        weights=plot_df.loc[mask, weight],
+        norm=norm,
+        cmap=cmap
+    )
+
+    # 4) Reference line
     if show_line:
-        # Here we assume you want a line over the bin range.
-        # If bins is a sequence, use its first and last values; otherwise, derive from data.
         if hasattr(bins, '__len__'):
-            ref_min, ref_max = bins[0], bins[-1]
+            rmin, rmax = bins[0], bins[-1]
         else:
-            ref_min, ref_max = plot_df[x].min(), plot_df[x].max()
-        ax.plot([ref_min, ref_max], [ref_min, ref_max], color=line_color,
-                label=line_label if line_label else 'Reference')
-    
-    # Set axis scales if provided.
+            rmin, rmax = plot_df[x].min(), plot_df[x].max()
+        ax.plot([rmin, rmax], [rmin, rmax],
+                color=line_color,
+                label=line_label or 'Reference')
+
+    # 5) Axes scales, labels, title
     if xscale:
         ax.set_xscale(xscale)
     if yscale:
         ax.set_yscale(yscale)
-    
-    # Set axis labels.
-    ax.set_xlabel(xlabel if xlabel else x)
-    ax.set_ylabel(ylabel if ylabel else y)
-    
-    # Set title if provided.
+    ax.set_xlabel(xlabel or x)
+    ax.set_ylabel(ylabel or y)
     if title:
         ax.set_title(title)
-    
-    # Add legend if a reference line is drawn.
     if show_line and line_label:
         ax.legend(loc=legend_loc)
-    
-    # Add colorbar and set its label if provided.
-    cbar = fig.colorbar(h[3], ax=ax)
+
+    # 6) Colorbar
+    cbar = fig.colorbar(image, ax=ax)
     if colorbar_label:
         cbar.set_label(colorbar_label)
-    
-    plt.tight_layout()
+
+    fig.tight_layout()
     plt.show()
 
+    return fig, ax
 # Example usage:
 if __name__ == '__main__':
     # Create dummy data

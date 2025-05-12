@@ -96,44 +96,40 @@ def weighted_stats(values, weights):
     variance = np.average((values - weighted_mean) ** 2, weights=weights)
     return weighted_mean, np.sqrt(variance)
 
-def plot_difference(data_input,
-                    x_value_name,
-                    y_value_reco,
-                    y_value_true,
-                    weight_name="weight",
-                    labels=None,
-                    colors=None,
-                    bins=None,
-                    xscale=None,
-                    yscale=None,
-                    xlim=None,
-                    ylim=None,
-                    show=True,
-                    save_path=None):
-    """
-    Plot weighted differences for one or more datasets and one or more reconstructed columns.
 
-    Parameters
-    ----------
-    data_input : pd.DataFrame or list of DataFrames or dict of DataFrames
-        If DataFrame: behaves as before.
-        If list:  will be auto‐labeled "df_0", "df_1", …
-        If dict:  keys are used as dataset labels.
-    x_value_name : str
-        Column name for the x-axis (used for binning).
-    y_value_reco : str or list of str
-        Column(s) for reconstructed y-values.
-    y_value_true : str
-        Column name for the true y-value.
-    weight_name : str
-    labels : list of str, optional
-        One label per curve.  Defaults to "<dataset>: Difference <col>".
-    colors : list of colors or single color, optional
-    bins : array-like, optional
-        Defaults to np.logspace(2, 8, 20).
-    (…rest as before…)
+
+def plot_difference(
+    data_input,
+    x_value_name,
+    y_value_reco,
+    y_value_true,
+    weight_name="weight",
+    labels=None,
+    colors=None,
+    bins=None,
+    xscale=None,
+    yscale=None,
+    xlim=None,
+    ylim=None,
+    x_transform: callable = None,
+    y_transform: callable = None,
+    show=True,
+    save_path=None
+):
     """
-    # --- Normalize data_input to a dict of DataFrames ---
+    Plot weighted differences, with optional transforms (e.g. np.cos or np.sin)
+    on the x-values or on the y-values before differencing.
+
+    New args:
+      x_transform : callable or None
+        A function f(x_array) to apply to the x data before binning.
+      y_transform : callable or None
+        A function g(y_array) to apply to each reconstructed and true y
+        before computing their absolute difference.
+
+    Other behavior unchanged.
+    """
+    # --- Normalize data_input to dict of DataFrames ---
     if isinstance(data_input, pd.DataFrame):
         data_dict = {"": data_input}
     elif isinstance(data_input, list):
@@ -143,19 +139,19 @@ def plot_difference(data_input,
     else:
         raise ValueError("data_input must be DataFrame, list, or dict of DataFrames")
 
-    # --- Normalize y_value_reco to a list ---
+    # --- Normalize y_value_reco to list ---
     if isinstance(y_value_reco, str):
         y_value_reco = [y_value_reco]
     n_vars = len(y_value_reco)
     n_data = len(data_dict)
-    total_curves = n_data * n_vars
+    total_curves = n_vars * n_data
 
-    # --- Default bins ---
+    # --- Default bins and centers ---
     if bins is None:
         bins = np.logspace(2, 8, 20)
     x_centers = (bins[:-1] + bins[1:]) / 2
 
-    # --- Build default labels if needed ---
+    # --- Build default labels & colors ---
     default_labels = []
     for dlabel in data_dict:
         for col in y_value_reco:
@@ -169,7 +165,6 @@ def plot_difference(data_input,
     elif len(labels) != total_curves:
         raise ValueError(f"labels must have length {total_curves}")
 
-    # --- Build default colors list ---
     if colors is None:
         colors = [None] * total_curves
     elif not isinstance(colors, (list, tuple)):
@@ -177,32 +172,42 @@ def plot_difference(data_input,
     elif len(colors) != total_curves:
         raise ValueError(f"colors must have length {total_curves}")
 
-    # --- Plotting setup ---
+    # --- Start plotting ---
     fig, ax = plt.subplots()
     curve_idx = 0
 
     for dlabel, df in data_dict.items():
+        # apply x‐transform once per dataset
+        x_raw = df[x_value_name].values
+        x_vals = x_transform(x_raw) if x_transform else x_raw
+
         for col in y_value_reco:
-            # compute absolute difference
-            diff = np.abs(df[col] - df[y_value_true])
+            # fetch reco and true, apply y‐transform if given
+            reco = df[col].values
+            true = df[y_value_true].values
+            if y_transform:
+                reco = y_transform(reco)
+                true = y_transform(true)
+
+            diff = np.abs(reco - true)
             temp = pd.DataFrame({
-                x_value_name: df[x_value_name],
+                x_value_name: x_vals,
                 "difference": diff,
-                "weight": df[weight_name]
+                "weight":     df[weight_name].values
             })
+
             # bin and compute weighted stats
             temp["x_bin"] = pd.cut(temp[x_value_name], bins=bins, labels=False)
             results = (
-                temp
-                .groupby("x_bin")
-                .apply(lambda g: weighted_stats(g["difference"], g["weight"]))
-                .reindex(range(len(bins)-1), fill_value=(np.nan, np.nan))
+                temp.groupby("x_bin")
+                    .apply(lambda g: weighted_stats(g["difference"], g["weight"]))
+                    .reindex(range(len(bins)-1), fill_value=(np.nan, np.nan))
             )
             means = results.map(lambda t: t[0])
             stds  = results.map(lambda t: t[1])
             valid = ~np.isnan(means)
 
-            # plot_line_chart handles errorbars and scales
+            # plot with errorbands
             plot_line_chart(
                 x_centers[valid],
                 means[valid],
@@ -219,12 +224,11 @@ def plot_difference(data_input,
             )
             curve_idx += 1
 
-    # final formatting
-    ax.set_xlabel(x_value_name)
-    ax.set_ylabel("Difference")
+    ax.set_xlabel(x_value_name + (f" ({x_transform.__name__})" if x_transform else ""))
+    ax.set_ylabel("Difference" + (f" after {y_transform.__name__}" if y_transform else ""))
     ax.set_title("Difference Plot")
     ax.legend(loc="best")
-    plt.tight_layout()
+    fig.tight_layout()
 
     if save_path:
         fig.savefig(save_path)
@@ -233,7 +237,7 @@ def plot_difference(data_input,
     else:
         plt.close(fig)
 
-    return fig, ax
+    #return fig, ax
 
 # Example usage:
 if __name__ == '__main__':

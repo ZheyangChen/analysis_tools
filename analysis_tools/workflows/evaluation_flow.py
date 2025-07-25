@@ -125,7 +125,7 @@ def evaluation_flow(
 
     # Pre-BDT DataFrames by flavor
     dfs_pre = {fl: dfw[mask] for fl, mask in masks_pre.items()}
-    ax1 = plot_histograms(
+    fig1, ax1 = plot_histograms(
         data_input=dfs_pre,
         plotvar=score1_col,
         bins=bins,
@@ -136,12 +136,13 @@ def evaluation_flow(
         labels=['nue','numu','nutau'],
         show=False
     )
+
     ax1.axvline(best_t1, **vline_kwargs, label=f"BDT1 cut @ {best_t1:.2f}")
     ax1.legend(loc='best')
     plt.show()
-    ax1.figure.savefig(os.path.join(output_dir, f"{score1_col}_hist.png"))
+    fig1.savefig(os.path.join(output_dir, f"{score1_col}_hist.png"))
 
-    ax2 = plot_histograms(
+    fig2, ax2 = plot_histograms(
         data_input=dfs_pre,
         plotvar=score2_col,
         bins=bins,
@@ -155,13 +156,13 @@ def evaluation_flow(
     ax2.axvline(best_t2, **vline_kwargs, label=f"BDT2 cut @ {best_t2:.2f}")
     ax2.legend(loc='best')
     plt.show()
-    ax2.figure.savefig(os.path.join(output_dir, f"{score2_col}_hist.png"))
+    fig2.savefig(os.path.join(output_dir, f"{score2_col}_hist.png"))
 
     # 8) Energy histograms after BDT cut
     energy_var  = 'cscdSBU_MonopodFit4_noDC_energy'
     energy_bins = np.logspace(4.5, 8, 30)
     dfs_post = {fl: df_sel[mask] for fl, mask in masks_post.items()}
-    ax3 = plot_histograms(
+    fig3, ax3 = plot_histograms(
         data_input=dfs_post,
         plotvar=energy_var,
         bins=energy_bins,
@@ -174,7 +175,7 @@ def evaluation_flow(
         show=False
     )
     plt.show()
-    ax3.figure.savefig(os.path.join(output_dir, "energy_after_bdt.png"))
+    fig3.savefig(os.path.join(output_dir, "energy_after_bdt.png"))
 
     # 9) Optional diagnostics
     if run_diagnostics:

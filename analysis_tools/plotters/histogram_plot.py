@@ -6,68 +6,40 @@ import matplotlib.gridspec as gridspec
 from math import sqrt
 
 from typing import Sequence, Union, Dict, Any
-
+# histogram_plot.py
 
 def plot_histograms(
     data_input: Union[pd.DataFrame, Sequence[pd.DataFrame], Dict[str, pd.DataFrame]],
-    plotvar: Union[str, Sequence[str]],
+    plotvar:    Union[str, Sequence[str]],
     bins,
     weights_map: Union[str, Dict[str, str]] = 'weight',
-    normalized: bool = False,
-    histtype: str = 'step',
-    xscale: str = None,
-    yscale: str = 'log',
-    xlabel: str = None,
-    ylabel: str = None,
-    title: str = None,
-    legend_loc: str = 'best',
-    xlim: tuple = None,
-    ylim: tuple = None,
-    colors: Union[str, Sequence[str]] = None,
-    linestyles: Union[str, Sequence[str]] = None,
-    labels: Sequence[str] = None,
-    ax: plt.Axes = None,
-    vlines: Sequence[float] = None,
-    hlines: Sequence[float] = None,
+    normalized:  bool   = False,
+    histtype:    str    = 'step',
+    xscale:      str    = None,
+    yscale:      str    = 'log',
+    xlabel:      str    = None,
+    ylabel:      str    = None,
+    title:       str    = None,
+    legend_loc:  str    = 'best',
+    xlim:        tuple  = None,
+    ylim:        tuple  = None,
+    colors:      Union[str, Sequence[str]] = None,
+    linestyles:  Union[str, Sequence[str]] = None,
+    labels:      Sequence[str] = None,
+    ax:          plt.Axes = None,
+    vlines:      Sequence[float] = None,
+    hlines:      Sequence[float] = None,
     vline_kwargs: Dict[str, Any] = None,
     hline_kwargs: Dict[str, Any] = None,
-    show: bool = True,
-    save_path: str = None
-) -> plt.Axes:
+    show:        bool   = True,
+    save_path:   str    = None,
+    errorbar:    bool   = False
+) -> (plt.Figure, plt.Axes):
     """
-    Plot one or more histograms on the same Axes, with customizable colors,
-    linestyles, labels, and optional vertical/horizontal lines.
-
-    Modes:
-      • Multi-DF: data_input is dict or list of DataFrames, plotvar is a single column name.
-      • Multi-col: data_input is a single DataFrame, plotvar is a list of column names.
-
-    Parameters
-    ----------
-    data_input : DataFrame, list of DataFrames, or dict of DataFrames
-    plotvar    : str or list of str
-    bins       : array-like of bin edges or an integer
-    weights_map: str or dict mapping label→weight column name
-    normalized : bool
-    histtype   : str
-    xscale, yscale : str or None
-    xlabel, ylabel, title : str or None
-    legend_loc : str
-    xlim, ylim : tuple or None
-    colors     : single color or list of colors
-    linestyles : single style or list of styles (e.g. 'solid', 'dashed')
-    labels     : list of legend labels
-    ax         : existing Axes or None
-    vlines, hlines : list of floats
-    vline_kwargs, hline_kwargs : dict
-    show       : bool
-    save_path  : str or None
-
-    Returns
-    -------
-    ax : matplotlib Axes
+    Plot one or more histograms on the same Axes, with optional error bars
+    drawn at the top of each bin in the same color as its histogram.
     """
-    # — Determine data & variables —
+    # — determine dfs & plotvars (unchanged) —
     if isinstance(data_input, (dict, list)):
         if isinstance(data_input, list):
             data_dict = {f'df_{i}': df for i, df in enumerate(data_input)}
@@ -76,12 +48,12 @@ def plot_histograms(
         if isinstance(plotvar, (list, tuple)):
             raise ValueError("When data_input is dict/list, plotvar must be a single column name.")
         dfs      = list(data_dict.values())
-        plotvars = [plotvar] * len(dfs)
+        plotvars = [plotvar]*len(dfs)
         if labels is None:
             labels = list(data_dict.keys())
     elif isinstance(data_input, pd.DataFrame):
         if isinstance(plotvar, (list, tuple)):
-            dfs      = [data_input] * len(plotvar)
+            dfs      = [data_input]*len(plotvar)
             plotvars = list(plotvar)
             if labels is None:
                 labels = list(plotvar)
@@ -95,44 +67,43 @@ def plot_histograms(
 
     n = len(dfs)
 
-    # — Normalize colors —
+    # — normalize colors & linestyles —
     if colors is None:
-        colors = [None] * n
+        colors = [None]*n
     elif isinstance(colors, str):
-        colors = [colors] * n
+        colors = [colors]*n
     elif len(colors) != n:
         raise ValueError(f"{n} histograms but {len(colors)} colors provided")
 
-    # — Normalize linestyles —
     if linestyles is None:
-        linestyles = ['solid'] * n
+        linestyles = ['solid']*n
     elif isinstance(linestyles, str):
-        linestyles = [linestyles] * n
+        linestyles = [linestyles]*n
     elif len(linestyles) != n:
         raise ValueError(f"{n} histograms but {len(linestyles)} linestyles provided")
 
-    # — Check labels length —
     if len(labels) != n:
         raise ValueError(f"Must provide exactly {n} labels")
 
-    # — Set up Axes —
+    # — setup Axes —
     if ax is None:
         fig, ax = plt.subplots()
     else:
         fig = ax.figure
 
-    # — Plot each histogram —
+    # — plot each histogram & optional errorbars —
     for df, var, col, ls, lab in zip(dfs, plotvars, colors, linestyles, labels):
-        # Determine weights
+        # determine weights
         if isinstance(weights_map, str):
             w = df[weights_map]
         else:
             wspec = weights_map.get(lab)
             if wspec is None:
-                raise ValueError(f"No weight specification for label '{lab}'")
+                raise ValueError(f"No weight for label '{lab}'")
             w = df[wspec].sum(axis=1) if isinstance(wspec, list) else df[wspec]
 
-        ax.hist(
+        # draw histogram
+        counts, edges, patches = ax.hist(
             df[var],
             bins=bins,
             histtype=histtype,
@@ -143,38 +114,62 @@ def plot_histograms(
             label=lab
         )
 
-    # — Apply scales & limits —
+        if errorbar:
+            # pick the exact color used by the histogram
+            if col is not None:
+                ecolor = col
+            else:
+                # extract from the first patch
+                if isinstance(patches, (list, tuple)):
+                    ecolor = patches[0].get_edgecolor()
+                else:
+                    ec = patches.get_edgecolor()
+                    ecolor = ec[0] if isinstance(ec, np.ndarray) else ec
+
+            # compute ±√(Σw²)
+            sumw2, _ = np.histogram(df[var], bins=bins, weights=w**2)
+            errs = np.sqrt(sumw2)
+            centers = 0.5*(edges[:-1] + edges[1:])
+            # overlay errorbars at the bin tops
+            ax.errorbar(
+                centers, counts,
+                yerr=errs,
+                fmt='none',
+                ecolor=ecolor,
+                capsize=3,
+                alpha=0.8
+            )
+
+    # — apply scales & limits —
     if xscale: ax.set_xscale(xscale)
     if yscale: ax.set_yscale(yscale)
     if xlim:   ax.set_xlim(xlim)
     if ylim:   ax.set_ylim(ylim)
 
-    # — Labels, title, legend —
+    # — labels, legend, etc. —
     ax.set_xlabel(xlabel or "")
     default_ylabel = 'Probability Density' if normalized else 'Rate per Year'
     ax.set_ylabel(ylabel or default_ylabel)
     ax.set_title(title or "")
     ax.legend(loc=legend_loc)
 
-    # — Draw vlines/hlines if requested —
+    # — optional vlines/hlines —
     vline_kwargs = vline_kwargs or {}
     hline_kwargs = hline_kwargs or {}
     if vlines:
-        for x in vlines:
-            ax.axvline(x, **vline_kwargs)
+        for x0 in vlines:
+            ax.axvline(x0, **vline_kwargs)
     if hlines:
-        for y in hlines:
-            ax.axhline(y, **hline_kwargs)
+        for y0 in hlines:
+            ax.axhline(y0, **hline_kwargs)
 
-    # — Save & show/close —
+    # — save & show —
     if save_path:
         fig.savefig(save_path, bbox_inches='tight')
     if show:
         plt.show()
-    else:
-        plt.close(fig)
 
-    return ax
+    return fig, ax
 
 def compute_hist_with_errors(data, bins, weight, transform_func=None):
     """

@@ -7,27 +7,29 @@ common:
   legend_loc: "best"
   weights_map: "weight"
   normalized: false
-  histtype: "step"
-  errorbar: true
+  #histtype: "step"
   #save_path: "output/histogram.png"  # If you want to save, adjust the path as needed
   show: true
+  hist_weight: "weight"
+  errorbar_weight: "weight"
+  colors: ['b','y','g']
+  ylabel_ratio: "MC/Data Ratio"
 
 
-plot_type: histogram
+plot_type: stacked_hist_with_ratio
 
 variables:
   MonopodE:
     column: "cscdSBU_MonopodFit4_noDC_energy"            # Data column to plot
     bins:
       function: logspace
-      start: 2.6
+      start: 4.5
       stop: 8
       num: 30
     xlabel: "Energy[GeV]"
     title: "Monopod Energy"
     xscale: "log"
-    #color: "blue"
-
+    
   TaupedeAsymmetry:
     column: "{prefix}_Asymmetry_value"
     bins:
@@ -71,7 +73,7 @@ variables:
       num: 30
     xlabel: "Length[m]"
     title: "Taupede Cascade Distance"
-    
+
   Taupede_ftpFitParams_rlogl:
     column: "{prefix}FitParams_rlogl"
     bins:
@@ -110,7 +112,7 @@ variables:
       start: 2
       stop: 6.5
       num: 30
-    xlabel: "log10(Charge[p.e.])"
+    xlabel: "Charge"
     title: "Total Charge"
     
     
@@ -193,8 +195,7 @@ variables:
       stop: 100
       num: 30
     xlabel: "Delay_ice_value"
-    title: "cscdSBU_MonopodFit4_noDC_Delay_ice_value" 
-    legend_loc: "upper left"
+    title: "cscdSBU_MonopodFit4_noDC_Delay_ice_value"  
 
   cscdSBU_MonopodFit4_noDC_z:
     column: "cscdSBU_LE_bdt_input_cscdSBU_MonopodFit4_noDC_z"
@@ -205,7 +206,7 @@ variables:
       num: 30
     xlabel: "z"
     title: "cscdSBU_MonopodFit4_noDC_z"  
-    
+
   cscdSBU_MonopodFit4_noDC_zenith:
     column: "cscdSBU_LE_bdt_input_cscdSBU_MonopodFit4_noDC_zenith"
     bins:
@@ -214,19 +215,7 @@ variables:
       stop: 3.15
       num: 30
     xlabel: "zenith"
-    title: "cscdSBU_MonopodFit4_noDC_zenith"  
-    
-    
-  cscdSBU_MonopodFit4_noDCFitParams_rlogl:
-    column: "cscdSBU_MonopodFit4_noDCFitParams_rlogl"
-    bins:
-      function: linspace
-      start: 5
-      stop: 10
-      num: 30
-    xlabel: "rlogl"
-    title: "Monopod rlogl" 
-    
+    title: "cscdSBU_MonopodFit4_noDC_zenith" 
 
   cscdSBU_VertexRecoDist_CscdLLh:
     column: "cscdSBU_LE_bdt_input_cscdSBU_VertexRecoDist_CscdLLh"
@@ -252,12 +241,13 @@ variables:
     column: "CVStatistics_q_max_doms"
     bins:
       function: logspace
-      start: 1
+      start: 1.5
       stop: 5
       num: 30
     xlabel: "CVStatistics_q_max_doms"
     title: "q_max_doms" 
     xscale: "log"
+
 
   z_travel:
     column: "CVStatistics_z_travel"
@@ -268,8 +258,6 @@ variables:
       num: 30
     xlabel: "CVStatistics_z_travel"
     title: "z_travel" 
-
-
 
 
 

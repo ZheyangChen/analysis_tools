@@ -52,7 +52,7 @@ def add_variables(df):
             "Taupede_Asymmetry_value": "Taupede_spice3_Asymmetry_value",
             "Taupede_Distance_value": "Taupede_spice3_Distance_value",
         })
-        df.rename(columns=mapping, inplace=inplace) 
+        df.rename(columns=mapping, inplace=True) 
 
     if not 'cscdSBU_VertexRecoDist_CscdLLh' in df.columns:
         x1 = df['CscdL3_CascadeLlhVertexFit_x']

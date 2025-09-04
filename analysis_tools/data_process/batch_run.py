@@ -13,6 +13,20 @@ def batch_process():
     parser.add_argument("-i", "--input-dir", required=True)
     parser.add_argument("-o", "--output-dir", default="batch_output")
     parser.add_argument("-j", "--workers", type=int, default=4)
+    
+    # Add range/value selection like in merge_grouprun.py
+    group = parser.add_mutually_exclusive_group(required=False)
+    group.add_argument(
+        "-r", "--range",
+        nargs=2, type=int, metavar=("START", "END"),
+        help="Start and end (inclusive) for a continuous range of simprod IDs"
+    )
+    group.add_argument(
+        "-v", "--values",
+        nargs="+", type=int, metavar="N",
+        help="One or more discrete simprod ID values"
+    )
+    
     args = parser.parse_args()
 
     input_dir = Path(args.input_dir)
@@ -24,6 +38,30 @@ def batch_process():
         f for f in input_dir.glob("*")
         if f.is_file() and f.suffix.lower() in {'.h5', '.hdf'}
     ]
+
+    # Filter files based on range/value arguments
+    if args.range or args.values:
+        if args.range:
+            start, end = args.range
+            target_ids = set(str(prodid) for prodid in range(start, end + 1))
+        else:  # args.values
+            target_ids = set(str(v) for v in args.values)
+        
+        print(f"Filtering files for simprod IDs: {sorted(target_ids)}")
+        
+        # Filter files that match the target simprod IDs
+        filtered_files = []
+        for file in all_files:
+            file_name = file.name
+            pattern = r"(\d{5})(?=\.[^.]+$)"
+            match = re.search(pattern, file_name)
+            if match:
+                simid = match.group(1)
+                if simid in target_ids:
+                    filtered_files.append(file)
+        
+        all_files = filtered_files
+        print(f"Found {len(all_files)} files matching the criteria")
 
     Failed_list = []
     for file in all_files:

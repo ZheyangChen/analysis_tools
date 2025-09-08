@@ -1,7 +1,7 @@
 import numpy as np
 import glob
 
-def add_nugen_weights(df, ltime,indir, sv="step340",astro_norm = 1.6,astro_index = -2.5, cosmicray="HillasGaisser2012_H4a", hadronicinteraction="SIBYLL2.3c"):
+def add_nugen_weights(df, ltime,indir, sv="step340",astro_norm = 1.83,astro_index = -2.58, cosmicray="HillasGaisser2012_H4a", hadronicinteraction="SIBYLL2.3c"):
     print(cosmicray, hadronicinteraction)
     print(indir)
     nfiles = len(glob.glob(indir+f"/00*/final_cascade/*.i3.*"))

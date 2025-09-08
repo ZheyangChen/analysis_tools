@@ -86,8 +86,8 @@ def batch_process():
         start_time = time.time()
         try:
             #subprocess.run(['python','main.py','-i',infile,'-o',outdir+'/'+file_name,'-add_var','-flux','-add_weight',i3_path])
-            #subprocess.run(['python','main.py','-i',infile,'-o',outdir+'/'+file_name,'-add_var','-flux','-add_weight',i3_path],check=True)
-            subprocess.run(['python','main.py','-i',infile,'-o',outdir+'/'+file_name,'-add_var','-flux','-add_weight',i3_path,'-ecut','4.5'],check=True)
+            subprocess.run(['python','main.py','-i',infile,'-o',outdir+'/'+file_name,'-add_var','-flux','-add_weight',i3_path],check=True)
+            #subprocess.run(['python','main.py','-i',infile,'-o',outdir+'/'+file_name,'-add_var','-flux','-add_weight',i3_path,'-ecut','4.5'],check=True)
             #subprocess.run(['python','main.py','-i',infile,'-o',outdir+'/'+file_name,'-add_var','-flux','-add_weight',i3_path,'-precut'])
             #subprocess.run(['python','main.py','-i',infile,'-o',outdir+'/'+file_name,'-add_var','-add_pass1_weight',i3_path,'-precut'])
             elapsed = time.time() - start_time

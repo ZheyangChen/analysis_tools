@@ -243,6 +243,80 @@ def plot_difference(
         plt.close(fig)
         
         
+def plot_binned_purity(df, variable,
+                       is_signal=None,
+                       weight_col="weight",
+                       bins=20,
+                       xlabel=None, ylabel="Purity",
+                       title="Binned Purity", xlim=None, ylim=(0,1),
+                       xscale='linear', yscale='linear'):
+    """
+    Plot signal purity in bins of a given variable.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input DataFrame.
+    variable : str
+        Column name of the variable to bin.
+    is_signal : str, Series, or callable
+        Signal definition. Can be:
+          - str: column name for signal flags (==1 is signal)
+          - Series or boolean array: True for signal rows
+          - function: a function(row) -> bool, applied to each row
+    weight_col : str
+        Column name for weights.
+    bins : int or sequence
+        Binning for the variable.
+    xlabel, ylabel, title : str
+        Axis labels and plot title.
+    xlim, ylim : tuple
+        Axis ranges.
+    xscale, yscale : str
+        Scale type (e.g., 'linear', 'log').
+    """
+    if is_signal is None:
+        raise ValueError("You must specify `is_signal` as a column name, mask, or function.")
+    elif isinstance(is_signal, str):
+        signal_mask = df[is_signal] == 1
+    elif callable(is_signal):
+        signal_mask = df.apply(is_signal, axis=1)
+    elif isinstance(is_signal, (pd.Series, np.ndarray)):
+        signal_mask = is_signal
+    else:
+        raise TypeError("`is_signal` must be a str, function, or boolean mask.")
+
+    var = df[variable]
+    w   = df[weight_col]
+
+    # Total and signal weights per bin
+    total, edges = np.histogram(var, bins=bins, weights=w)
+    signal, _    = np.histogram(var[signal_mask], bins=edges, weights=w[signal_mask])
+
+    # Purity
+    with np.errstate(divide="ignore", invalid="ignore"):
+        purity = np.divide(signal, total, out=np.zeros_like(signal, dtype=float), where=total>0)
+
+    centers = 0.5 * (edges[:-1] + edges[1:])
+
+    # Plot
+    plt.figure(figsize=(7,5))
+    plt.plot(centers, purity, marker="o", linestyle="-", label="Purity")
+    plt.xlabel(xlabel or variable)
+    plt.ylabel(ylabel)
+    plt.title(title)
+    if xlim: plt.xlim(xlim)
+    if ylim: plt.ylim(ylim)
+    if xscale: plt.xscale(xscale)
+    if yscale: plt.yscale(yscale)
+    plt.grid(True, linestyle="--", alpha=0.5)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+    return centers, purity
+        
+        
 # Example usage:
 if __name__ == '__main__':
     np.random.seed(0)
@@ -266,3 +340,14 @@ if __name__ == '__main__':
                              y_value_true=y_value_true,
                              xscale='linear', yscale='linear',
                              xlim=(100, 1000), ylim=(0, 30))
+    
+    
+    # Example plot for purity plot
+    # 1. With a column name
+    plot_binned_purity(df_example, "score", is_signal="true_label")
+
+    # 2. With a mask
+    plot_binned_purity(df_example, "energy", is_signal=(df["label"] == "signal"))
+
+    # 3. With a function
+    plot_binned_purity(df_example, "zenith", is_signal=lambda row: row["pid"] == 15 and row["energy"] > 1e5)

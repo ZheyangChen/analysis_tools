@@ -254,7 +254,8 @@ def plot_stacked_hist_with_ratio(hist_data, errorbar_data, plotvar, bins,
     rel_error_errorbar = np.zeros_like(hist_errorbar, dtype=float)
     rel_error_combined[mask] = combined_error[mask] / combined_hist[mask]
     rel_error_errorbar[mask] = error[mask] / hist_errorbar[mask]
-    ratio_error[mask] = ratio[mask] * np.sqrt(rel_error_combined[mask]**2 + rel_error_errorbar[mask]**2)
+    #ratio_error[mask] = ratio[mask] * np.sqrt(rel_error_combined[mask]**2 + rel_error_errorbar[mask]**2)
+    ratio_error[mask] = ratio[mask] * (error[mask] / hist_errorbar[mask])
     
     ax_ratio.step(bin_centers, ratio, where='mid', label=ratio_label)
     ax_ratio.errorbar(bin_centers, ratio, yerr=ratio_error, fmt='k.', elinewidth=1, ms=3)

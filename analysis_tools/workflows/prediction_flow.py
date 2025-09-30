@@ -4,6 +4,19 @@ import pandas as pd
 from typing import Dict, List, Optional
 import numpy as np
 
+import xgboost as xgb
+
+
+class BoosterWrapper:
+    def __init__(self, booster: xgb.Booster):
+        self.booster = booster
+
+    def predict_proba(self, X):
+        dmatrix = xgb.DMatrix(X)
+        proba = self.booster.predict(dmatrix)
+        return np.column_stack((1 - proba, proba))  # shape (n, 2)
+
+
 def predict_scores(
     df: pd.DataFrame,
     models: Dict[str, object],

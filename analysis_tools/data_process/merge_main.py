@@ -115,12 +115,14 @@ def main():
         out_set = pd.DataFrame()
         print('start merging files')
         if args.simprodid:
-            indir = sorted(glob.glob(indir_master+f"/{simprodid}/00*/final_cascade/h5file/"))
+            #indir = sorted(glob.glob(indir_master+f"/{simprodid}/00*/final_cascade/h5file/"))
+            indir = sorted(glob.glob(indir_master+f"/{simprodid}/*h5file/"))
             #indir = sorted(glob.glob(indir_master+f"/{simprodid}/p0=0.0_p1=0.0_domeff=1.00/00*/final_cascade/h5file/"))
             #indir = sorted(glob.glob(indir_master+f"/{simprodid}/0043000-0043999/final_cascade/h5file/"))
             for ind in indir:
                 #print('current indir is: ',ind)
                 filelist = sorted(glob.glob(ind+"*evel*.0*.h5"))
+                print('Merging {len(filelist)} files')
                 for infile in filelist:
                     try:
                         f = h5py.File(infile)

@@ -100,16 +100,17 @@ def converti3toh5(infile,outfile,ismgun,isdata):
     depth_name_suffix = '_v1_gcd'
     snowstorm_keys = ['SnowstormParameterDict','PolyplopiaPrimary','cscdSBU_AtmWeight_Prompt_berss','cscdSBU_L4StartingTrackHLC_cscdSBU_MonopodFit4_OfflinePulsesHLC_noDCVetoCharge','cscdSBU_LE_bdt_cascade','cscdSBU_LE_bdt_hybrid','cscdSBU_LE_bdt_track','cscdSBU_LE_bdt_input','cscdSBU_MCPrimary','cscdSBU_VetoMaxDomChargeOM',"penetrating_depth"+depth_name_suffix]
     key1.extend(snowstorm_keys)
-    additional_treatments_keys = ['TotalWeight_glashowcorrection','Energy_tau_lepton','Energy_tau_decayproduct','Number_tau_decaypions','Number_tau_decaypi0','Energy_tau_decaynutau']
+    additional_treatments_keys = ['TotalWeight_glashowcorrection','Energy_tau_lepton','Energy_tau_decayproduct','Number_tau_decaypions','Number_tau_decaypi0','Energy_tau_decaynutau','Charmtype']
     key1.extend(additional_treatments_keys)
     Taupede_name1 = 'Taupede_newmonoseed'
     Taupede_name2 = 'New_Taupede'
-    Monopod_name = 'MonopodFit_iMIGRAD_testing'
+    Monopod_name = 'MonopodFit_iMIGRAD_PPB0'
     newreco_keys = [Monopod_name,
                     Monopod_name+'AmpSeed',
                     Monopod_name+'AmpSeedFitParams',
                     Monopod_name+'FitParams',
                     Monopod_name+'_Seed',
+                    Monopod_name+'_VertexRecoDist_CscdLLh',  
                     Taupede_name1,
                     Taupede_name1+'FitParams',
                     Taupede_name1+'Particles',

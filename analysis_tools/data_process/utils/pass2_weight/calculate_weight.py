@@ -9,6 +9,8 @@ def add_nugen_weights(df, ltime,indir, sv="step340",astro_norm = 1.83,astro_inde
         nfiles = len(glob.glob(indir+f"/p0=0.0_p1=0.0_domeff=1.00/00*/final_cascade/*.i3.*"))
     if nfiles == 0:
         nfiles = len(glob.glob(indir+f"/*.i3.*"))
+    #if nfiles == 0:
+    #    nfiles = len(glob.glob(indir + f"*/*.i3.*"))
     print('number of files ',nfiles)
 
     df['nfiles'] = np.ones(len(df.index))*nfiles

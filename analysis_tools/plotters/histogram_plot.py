@@ -199,7 +199,7 @@ def plot_stacked_hist_with_ratio(hist_data, errorbar_data, plotvar, bins,
                                  xlabel=None, ylabel_hist='Rate per Year', ylabel_ratio='Ratio',
                                  title=None, legend_loc='best',
                                  xlim=None, ylim_hist=None, ylim_ratio=None,
-                                 colors=None, errorbar_label='Data', ratio_label='Ratio (MC/Data)'):
+                                 colors=None, errorbar_label='Data', ratio_label='Ratio (Data/MC)'):
     # Convert hist_data to dict if needed.
     if isinstance(hist_data, pd.DataFrame):
         hist_data = {'data': hist_data}
@@ -249,7 +249,7 @@ def plot_stacked_hist_with_ratio(hist_data, errorbar_data, plotvar, bins,
     mask = hist_errorbar > 0
     ratio = np.full_like(combined_hist, np.nan, dtype=float)
     ratio_error = np.full_like(combined_hist, np.nan, dtype=float)
-    ratio[mask] = combined_hist[mask] / hist_errorbar[mask]
+    ratio[mask] = hist_errorbar[mask] / combined_hist[mask]
     rel_error_combined = np.zeros_like(combined_hist, dtype=float)
     rel_error_errorbar = np.zeros_like(hist_errorbar, dtype=float)
     rel_error_combined[mask] = combined_error[mask] / combined_hist[mask]
@@ -286,5 +286,5 @@ def plot_stacked_hist_with_ratio(hist_data, errorbar_data, plotvar, bins,
     ax_hist.legend(loc=legend_loc)
     ax_ratio.legend(loc=legend_loc)
     
-    plt.tight_layout()
+    #plt.tight_layout()
     plt.show()

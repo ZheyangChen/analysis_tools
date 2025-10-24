@@ -115,6 +115,42 @@ def apply_selection(data_input, criteria):
             "a list of DataFrames, or a dict of DataFrames."
         )
 
+def make_mask_from_criteria(df: pd.DataFrame, criteria: dict) -> pd.Series:
+    """
+    Build a boolean mask from the same criteria syntax used in select_data_with_operators().
+    """
+    ops = {
+        '>':  operator.gt,
+        '<':  operator.lt,
+        '>=': operator.ge,
+        '<=': operator.le,
+        '==': operator.eq,
+        '!=': operator.ne,
+    }
+
+    mask = pd.Series(True, index=df.index)
+
+    for col, cond in criteria.items():
+        col_mask = pd.Series(True, index=df.index)
+        if isinstance(cond, dict):
+            if 'and' in cond:
+                for op_str, val in cond['and']:
+                    col_mask &= ops[op_str](df[col], val)
+            if 'or' in cond:
+                or_mask = pd.Series(False, index=df.index)
+                for op_str, val in cond['or']:
+                    or_mask |= ops[op_str](df[col], val)
+                col_mask &= or_mask
+        else:
+            tests = cond
+            if isinstance(cond, tuple):
+                tests = [cond]
+            for op_str, val in tests:
+                col_mask &= ops[op_str](df[col], val)
+        mask &= col_mask
+    return mask
+        
+        
 '''
 # Example usage:
 from apply_selection import apply_selection

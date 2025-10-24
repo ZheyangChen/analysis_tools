@@ -45,8 +45,10 @@ def plot_multi_var(df, config, errorbar_data=None):
     common_legend    = common.get('legend_loc', 'best')
     common_save_path = common.get('save_path')
     common_show      = common.get('show', True)
-    common_errorbar  = common.get('errorbar', False)    # ← new!
-    common_colors    = common.get('colors')             # list of colors
+    common_errorbar  = common.get('errorbar', False)  
+    common_colors    = common.get('colors')            
+    common_ylim_ratio  = common.get('ylim_ratio')
+
 
     common_hist_weight = common.get('hist_weight', common_weights)
     common_err_weight  = common.get('errorbar_weight', common_weights)
@@ -116,12 +118,14 @@ def plot_multi_var(df, config, errorbar_data=None):
             yscale      = var_cfg.get('yscale',       common_yscale)
             xlim        = var_cfg.get('xlim')
             ylim_hist   = var_cfg.get('ylim_hist')
-            ylim_ratio  = var_cfg.get('ylim_ratio')
             errorbar_lab= var_cfg.get('errorbar_label', 'Data')
-            ratio_label = var_cfg.get('ratio_label', 'Ratio (MC/Data)')
+            ratio_label = var_cfg.get('ratio_label', 'Ratio (Data/MC)')
+            ylim_ratio  = var_cfg.get('ylim_ratio') or common_ylim_ratio
+
 
             # colors for stacked bars: use common_colors list if provided
             colors = var_cfg.get('color') or common_colors
+            
 
             plot_stacked_hist_with_ratio(
                 hist_data       = df,

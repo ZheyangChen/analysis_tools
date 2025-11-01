@@ -24,7 +24,7 @@ variables:
     bins:
       function: logspace
       start: 4.5
-      stop: 8
+      stop: 7
       num: 20
     xlabel: "Energy[GeV]"
     title: "Monopod Energy"
@@ -36,18 +36,18 @@ variables:
       function: linspace
       start: -1
       stop: 1
-      num: 30
+      num: 20
     xlabel: "Asymmetry"
     title: "Taupede Asymmetry"
-    legend_loc: "upper left"
+    legend_loc: "lower right"
     
   Taupede1Energy:
     column: "{prefix}_1Particles_energy"
     bins:
       function: logspace
       start: 2
-      stop: 8
-      num: 30
+      stop: 7
+      num: 20
     xlabel: "Energy[GeV]"
     title: "Taupede 1st Cascade Energy"
     xscale: "log"
@@ -58,8 +58,8 @@ variables:
     bins:
       function: logspace
       start: 2
-      stop: 8
-      num: 30
+      stop: 7
+      num: 20
     xlabel: "Energy[GeV]"
     title: "Taupede 2nd Cascade Energy"
     xscale: "log"
@@ -70,7 +70,7 @@ variables:
       function: linspace
       start: 0
       stop: 100
-      num: 30
+      num: 20
     xlabel: "Length[m]"
     title: "Taupede Cascade Distance"
 
@@ -78,9 +78,9 @@ variables:
     column: "{prefix}FitParams_rlogl"
     bins:
       function: linspace
-      start: 5
-      stop: 10
-      num: 30
+      start: 4.5
+      stop: 9
+      num: 20
     xlabel: "rlogl"
     title: "Taupede rlogl"
     
@@ -88,9 +88,9 @@ variables:
     column: "cscdSBU_MonopodFit4_noDCFitParams_rlogl"
     bins:
       function: linspace
-      start: 5
-      stop: 10
-      num: 30
+      start: 4.5
+      stop: 9
+      num: 20
     xlabel: "rlogl"
     title: "Monopod rlogl"
     
@@ -100,9 +100,33 @@ variables:
       function: linspace
       start: -0.5
       stop: 0.1
-      num: 30
+      num: 20
     xlabel: "Difference"
     title: "Taupede Monopod rlogl difference"
+    
+  Taupede_ftpFitParams_logl:
+    column: "{prefix}FitParams_logl"
+    bins:
+      function: logspace
+      start: 2.5
+      stop: 6
+      num: 20
+    xlabel: "logl"
+    title: "Taupede logl" 
+    xscale: "log"
+
+  
+  cscdSBU_MonopodFit4_noDCFitParams_logl:
+    column: "cscdSBU_MonopodFit4_noDCFitParams_logl"
+    bins:
+      function: logspace
+      start: 2.5
+      stop: 6
+      num: 20
+    xlabel: "logl"
+    title: "Monopod logl"  
+    xscale: "log"
+    
     
   Taupede_ftpFitParams_ndof:
     column: "{prefix}FitParams_ndof"
@@ -129,9 +153,9 @@ variables:
     column: "cscdSBU_LE_bdt_input_cscdSBU_Qtot_HLC_log_value"
     bins:
       function: linspace
-      start: 2
-      stop: 6.5
-      num: 30
+      start: 3
+      stop: 6
+      num: 20
     xlabel: "Charge"
     title: "Total Charge"
      
@@ -142,7 +166,7 @@ variables:
       function: linspace
       start: 0
       stop: 1
-      num: 30
+      num: 20
     xlabel: "XY scale"
     title: "cscdSBU_I3XYScale_noDC_value"  
 
@@ -151,9 +175,9 @@ variables:
     column: "cscdSBU_LE_bdt_input_cscdSBU_MonopodFit4_noDC_Delay_ice_value"
     bins:
       function: linspace
-      start: -1000
+      start: -200
       stop: 100
-      num: 30
+      num: 20
     xlabel: "Delay_ice_value"
     title: "cscdSBU_MonopodFit4_noDC_Delay_ice_value"  
 
@@ -164,7 +188,7 @@ variables:
       function: linspace
       start: 0
       stop: 3.15
-      num: 30
+      num: 20
     xlabel: "zenith"
     title: "cscdSBU_MonopodFit4_noDC_zenith" 
 
@@ -173,8 +197,8 @@ variables:
     bins:
       function: linspace
       start: 0
-      stop: 120
-      num: 30
+      stop: 25
+      num: 20
     xlabel: "RecoDist"
     title: "cscdSBU_VertexRecoDist_CscdLLh" 
 
@@ -185,7 +209,7 @@ variables:
       function: logspace
       start: 1.5
       stop: 5
-      num: 30
+      num: 20
     xlabel: "CVStatistics_q_max_doms"
     title: "q_max_doms" 
     xscale: "log"
@@ -196,7 +220,7 @@ variables:
       function: linspace
       start: -500
       stop: 500
-      num: 30
+      num: 20
     xlabel: "z"
     title: "cscdSBU_MonopodFit4_noDC_z"  
 
@@ -207,7 +231,7 @@ variables:
       function: linspace
       start: -500
       stop: 500
-      num: 30
+      num: 20
     xlabel: "x"
     title: "cscdSBU_MonopodFit4_noDC_x"  
     
@@ -218,6 +242,6 @@ variables:
       function: linspace
       start: -500
       stop: 500
-      num: 30
+      num: 20
     xlabel: "y"
     title: "cscdSBU_MonopodFit4_noDC_y"  

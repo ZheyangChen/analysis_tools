@@ -109,9 +109,9 @@ variables:
     column: "{prefix}FitParams_logl"
     bins:
       function: logspace
-      start: 0
+      start: 2.5
       stop: 6
-      num: 30
+      num: 20
     xlabel: "logl"
     title: "Taupede logl" 
     xscale: "log"
@@ -121,9 +121,9 @@ variables:
     column: "cscdSBU_MonopodFit4_noDCFitParams_logl"
     bins:
       function: logspace
-      start: 0
+      start: 2.5
       stop: 6
-      num: 30
+      num: 20
     xlabel: "logl"
     title: "Monopod logl"  
     xscale: "log"

@@ -244,12 +244,13 @@ def plot_difference(
         
         
 def plot_binned_purity(df, variable,
-                       is_signal=None,
+                       is_signal="is_signal",
                        weight_col="weight",
                        bins=20,
                        xlabel=None, ylabel="Purity",
                        title="Binned Purity", xlim=None, ylim=(0,1),
-                       xscale='linear', yscale='linear'):
+                       xscale='linear', yscale='linear',
+                       show=True):
     """
     Plot signal purity in bins of a given variable.
 
@@ -312,7 +313,8 @@ def plot_binned_purity(df, variable,
     plt.grid(True, linestyle="--", alpha=0.5)
     plt.legend()
     plt.tight_layout()
-    plt.show()
+    if show:
+        plt.show()
 
     return centers, purity
         

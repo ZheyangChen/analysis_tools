@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from scipy.stats import norm
+from scipy.stats import norm,poisson
 from typing import Optional
 import matplotlib.pyplot as plt
 from scipy.stats import ks_2samp, chi2 as chi2_dist
@@ -11,6 +11,7 @@ def compare_data_mc_rate_only(
     weight_col: str = "weight",
     data_weight_col: Optional[str] = None,
     variable_filter: Optional[str] = None,
+    distribution = 'poisson',
 ):
     """
     Perform overall rate comparison between Data and MC.
@@ -65,21 +66,48 @@ def compare_data_mc_rate_only(
     # ----------------
     # Ratio / Pull / p
     # ----------------
-    ratio = n_data / n_mc if n_mc > 0 else np.nan
-    combined_err = np.sqrt(err_data**2 + err_mc**2)
-    pull = (n_data - n_mc) / combined_err if combined_err > 0 else np.nan
-    p_value = 2 * (1 - norm.cdf(abs(pull))) if not np.isnan(pull) else np.nan
+    if distribution == 'poisson':
+        ratio = n_data / n_mc if n_mc > 0 else np.nan
+        # Two-sided Poisson p-value
+        if n_mc > 0:
+            if n_data < n_mc:
+                p_lower = poisson.cdf(n_data, n_mc)
+                p_value = 2 * p_lower
+            else:
+                p_upper = poisson.sf(n_data - 1, n_mc)
+                p_value = 2 * p_upper
+            p_value = min(p_value, 1.0)
+        else:
+            p_value = np.nan
+        pull = np.nan
+        # ----------------
+        # Print Results
+        # ----------------
+        print(f"--- Data vs MC Rate Comparison ---")
+        print(f"Data count:           {n_data:.1f} ± {err_data:.1f}" + (f" (weighted by '{data_weight_col}')" if data_weight_col else ""))
+        print(f"MC predicted rate:    {n_mc:.2f} ± {err_mc:.2f} (weighted by '{weight_col}')")
+        print(f"Data/MC ratio:        {ratio:.3f}")
+        print(f"p-value (Poisson):   {p_value:.3g}")
+        print("----------------------------------")
 
-    # ----------------
-    # Print Results
-    # ----------------
-    print(f"--- Data vs MC Rate Comparison ---")
-    print(f"Data count:           {n_data:.1f} ± {err_data:.1f}" + (f" (weighted by '{data_weight_col}')" if data_weight_col else ""))
-    print(f"MC predicted rate:    {n_mc:.2f} ± {err_mc:.2f} (weighted by '{weight_col}')")
-    print(f"Data/MC ratio:        {ratio:.3f}")
-    print(f"Pull (D − MC)/σ:      {pull:.2f}")
-    print(f"p-value (Gaussian):   {p_value:.3g}")
-    print("----------------------------------")
+    
+    elif distribution == 'gaussian':
+    
+        ratio = n_data / n_mc if n_mc > 0 else np.nan
+        combined_err = np.sqrt(err_data**2 + err_mc**2)
+        pull = (n_data - n_mc) / combined_err if combined_err > 0 else np.nan
+        p_value = 2 * (1 - norm.cdf(abs(pull))) if not np.isnan(pull) else np.nan
+
+        # ----------------
+        # Print Results
+        # ----------------
+        print(f"--- Data vs MC Rate Comparison ---")
+        print(f"Data count:           {n_data:.1f} ± {err_data:.1f}" + (f" (weighted by '{data_weight_col}')" if data_weight_col else ""))
+        print(f"MC predicted rate:    {n_mc:.2f} ± {err_mc:.2f} (weighted by '{weight_col}')")
+        print(f"Data/MC ratio:        {ratio:.3f}")
+        print(f"Pull (D − MC)/σ:      {pull:.2f}")
+        print(f"p-value (Gaussian):   {p_value:.3g}")
+        print("----------------------------------")
 
     return {
         "n_data": n_data,

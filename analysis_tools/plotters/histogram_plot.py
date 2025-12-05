@@ -199,13 +199,56 @@ def plot_stacked_hist_with_ratio(hist_data, errorbar_data, plotvar, bins,
                                  xlabel=None, ylabel_hist='Rate per Year', ylabel_ratio='Ratio',
                                  title=None, legend_loc='best',
                                  xlim=None, ylim_hist=None, ylim_ratio=None,
-                                 colors=None, errorbar_label='Data', ratio_label='Ratio (Data/MC)'):
+                                 colors=None, errorbar_label='Data', ratio_label='Ratio (Data/MC)',
+                                 hist_labels=None):
+    """
+    Plot stacked MC histogram with errorbar data overlay and data/MC ratio.
+
+    Parameters
+    ----------
+    hist_data : DataFrame, list of DataFrames, or dict
+        MC histograms.
+    errorbar_data : DataFrame
+        Data points to overlay with error bars.
+    plotvar : str
+        Variable to plot.
+    bins : int or sequence
+        Histogram bins.
+    hist_weight : str
+        Column name for MC weights.
+    errorbar_weight : str
+        Column name for data weights.
+    transform_func : callable, optional
+        Function to transform x values.
+    xscale, yscale : str
+        Axis scaling (e.g., 'linear', 'log').
+    xlabel, ylabel_hist, ylabel_ratio, title : str
+        Plot labels.
+    legend_loc : str
+        Legend location.
+    xlim, ylim_hist, ylim_ratio : tuple
+        Axis limits.
+    colors : list
+        Colors for stacked components.
+    errorbar_label : str
+        Label for the errorbar data.
+    ratio_label : str
+        Label for the ratio plot.
+    hist_labels : list of str, optional
+        Custom labels for the hist_data if it's a list or single DataFrame.
+    """
+
     # Convert hist_data to dict if needed.
     if isinstance(hist_data, pd.DataFrame):
-        hist_data = {'data': hist_data}
+        label = hist_labels[0] if hist_labels else 'MC'
+        hist_data = {label: hist_data}
     elif isinstance(hist_data, list):
-        hist_data = {f'df_{i}': df for i, df in enumerate(hist_data)}
-    
+        if hist_labels:
+            assert len(hist_labels) == len(hist_data), "hist_labels length must match hist_data"
+            hist_data = {label: df for label, df in zip(hist_labels, hist_data)}
+        else:
+            hist_data = {f'df_{i}': df for i, df in enumerate(hist_data)}
+        
     # Create figure and manually position axes for perfect alignment.
     fig = plt.figure(figsize=(8, 6))
     ax_hist = fig.add_axes([0.1, 0.3, 0.85, 0.6])

@@ -208,7 +208,7 @@ def plot_stacked_hist_with_ratio(hist_data, errorbar_data, plotvar, bins,
                                  title=None, legend_loc='best',
                                  xlim=None, ylim_hist=None, ylim_ratio=None,
                                  colors=None, errorbar_label='Data', ratio_label='Ratio (Data/MC)',
-                                 hist_labels=None):
+                                 hist_labels=None, hist_ratio=True):
     """
     Plot stacked MC histogram with errorbar data overlay and data/MC ratio.
 
@@ -259,8 +259,12 @@ def plot_stacked_hist_with_ratio(hist_data, errorbar_data, plotvar, bins,
         
     # Create figure and manually position axes for perfect alignment.
     fig = plt.figure(figsize=(8, 6))
-    ax_hist = fig.add_axes([0.1, 0.3, 0.85, 0.6])
-    ax_ratio = fig.add_axes([0.1, 0.1, 0.85, 0.2], sharex=ax_hist)
+    if hist_ratio:
+        ax_hist = fig.add_axes([0.1, 0.3, 0.85, 0.6])
+        ax_ratio = fig.add_axes([0.1, 0.1, 0.85, 0.2], sharex=ax_hist)
+    else:
+        ax_hist = fig.add_axes([0.1, 0.15, 0.85, 0.75])
+        ax_ratio = None
     
     # ----- Stacked Histogram -----
     stacked_datasets, stacked_weights, labels = [], [], []
@@ -288,54 +292,67 @@ def plot_stacked_hist_with_ratio(hist_data, errorbar_data, plotvar, bins,
     bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
     ax_hist.errorbar(bin_centers, hist_errorbar, yerr=error, fmt='k.', elinewidth=1, ms=3,
                      label=errorbar_label)
-    
-    # ----- Ratio Calculation -----
-    combined_hist = np.sum([np.histogram(
-        transform_func(df[plotvar]) if transform_func else df[plotvar],
-        bins=bins, weights=df[hist_weight])[0] for df in hist_data.values()], axis=0)
-    combined_error = np.sqrt(np.sum([np.histogram(
-        transform_func(df[plotvar]) if transform_func else df[plotvar],
-        bins=bins, weights=df[hist_weight]**2)[0] for df in hist_data.values()], axis=0))
-    
-    mask = hist_errorbar > 0
-    ratio = np.full_like(combined_hist, np.nan, dtype=float)
-    ratio_error = np.full_like(combined_hist, np.nan, dtype=float)
-    ratio[mask] = hist_errorbar[mask] / combined_hist[mask]
-    rel_error_combined = np.zeros_like(combined_hist, dtype=float)
-    rel_error_errorbar = np.zeros_like(hist_errorbar, dtype=float)
-    rel_error_combined[mask] = combined_error[mask] / combined_hist[mask]
-    rel_error_errorbar[mask] = error[mask] / hist_errorbar[mask]
-    #ratio_error[mask] = ratio[mask] * np.sqrt(rel_error_combined[mask]**2 + rel_error_errorbar[mask]**2)
-    ratio_error[mask] = ratio[mask] * (error[mask] / hist_errorbar[mask])
-    
-    ax_ratio.step(bin_centers, ratio, where='mid', label=ratio_label)
-    ax_ratio.errorbar(bin_centers, ratio, yerr=ratio_error, fmt='k.', elinewidth=1, ms=3)
-    ax_ratio.axhline(1, color='black', linestyle='--', linewidth=1)
+
+    if hist_ratio:
+        # ----- Ratio Calculation -----
+        combined_hist = np.sum([np.histogram(
+            transform_func(df[plotvar]) if transform_func else df[plotvar],
+            bins=bins, weights=df[hist_weight])[0] for df in hist_data.values()], axis=0)
+        combined_error = np.sqrt(np.sum([np.histogram(
+            transform_func(df[plotvar]) if transform_func else df[plotvar],
+            bins=bins, weights=df[hist_weight]**2)[0] for df in hist_data.values()], axis=0))
+        
+        mask = hist_errorbar > 0
+        ratio = np.full_like(combined_hist, np.nan, dtype=float)
+        ratio_error = np.full_like(combined_hist, np.nan, dtype=float)
+        ratio[mask] = hist_errorbar[mask] / combined_hist[mask]
+        rel_error_combined = np.zeros_like(combined_hist, dtype=float)
+        rel_error_errorbar = np.zeros_like(hist_errorbar, dtype=float)
+        rel_error_combined[mask] = combined_error[mask] / combined_hist[mask]
+        rel_error_errorbar[mask] = error[mask] / hist_errorbar[mask]
+        #ratio_error[mask] = ratio[mask] * np.sqrt(rel_error_combined[mask]**2 + rel_error_errorbar[mask]**2)
+        ratio_error[mask] = ratio[mask] * (error[mask] / hist_errorbar[mask])
+        
+        ax_ratio.step(bin_centers, ratio, where='mid', label=ratio_label)
+        ax_ratio.errorbar(bin_centers, ratio, yerr=ratio_error, fmt='k.', elinewidth=1, ms=3)
+        ax_ratio.axhline(1, color='black', linestyle='--', linewidth=1)
+        if xscale:
+            ax_ratio.set_xscale(xscale)
+        if xlim:
+            ax_ratio.set_xlim(xlim)
+        if ylim_ratio:
+            ax_ratio.set_ylim(ylim_ratio)
+        ax_ratio.set_xlabel(xlabel if xlabel else plotvar)
+        ax_ratio.set_ylabel(ylabel_ratio)
+        ax_ratio.legend(loc=legend_loc)
+
+
+
     
     # ----- Axis Scales, Limits, and Labels -----
     if xscale:
         ax_hist.set_xscale(xscale)
-        ax_ratio.set_xscale(xscale)
     if yscale:
         ax_hist.set_yscale(yscale)
     if xlim:
         ax_hist.set_xlim(xlim)
-        ax_ratio.set_xlim(xlim)
     if ylim_hist:
         ax_hist.set_ylim(ylim_hist)
-    if ylim_ratio:
-        ax_ratio.set_ylim(ylim_ratio)
+
     
-    ax_hist.tick_params(labelbottom=False)
-    ax_ratio.set_xlabel(xlabel if xlabel else plotvar)
     ax_hist.set_ylabel(ylabel_hist)
-    ax_ratio.set_ylabel(ylabel_ratio)
+    if hist_ratio:
+        ax_hist.tick_params(labelbottom=False)
+        ax_ratio.set_xlabel(xlabel if xlabel else plotvar)
+        ax_ratio.set_ylabel(ylabel_ratio)
+        ax_ratio.legend(loc=legend_loc)
+    else:
+        ax_hist.set_xlabel(xlabel if xlabel else plotvar)
     
     if title:
         ax_hist.set_title(title)
     
     ax_hist.legend(loc=legend_loc)
-    ax_ratio.legend(loc=legend_loc)
     
     #plt.tight_layout()
     plt.show()

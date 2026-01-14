@@ -94,13 +94,21 @@ def plot_histograms(
     # — plot each histogram & optional errorbars —
     for df, var, col, ls, lab in zip(dfs, plotvars, colors, linestyles, labels):
         # determine weights
-        if isinstance(weights_map, str):
-            w = df[weights_map]
-        else:
+        # determine weights
+        if weights_map is None:
+            w = None
+        elif isinstance(weights_map, str):
+            if weights_map in df.columns:
+                w = df[weights_map]
+            else:
+                raise ValueError(f"Weight column '{weights_map}' not found in DataFrame")
+        elif isinstance(weights_map, dict):
             wspec = weights_map.get(lab)
             if wspec is None:
-                raise ValueError(f"No weight for label '{lab}'")
+                raise ValueError(f"No weight for label '{lab}' in weights_map")
             w = df[wspec].sum(axis=1) if isinstance(wspec, list) else df[wspec]
+        else:
+            raise ValueError("weights_map must be None, a string, or a dict")
 
         # draw histogram
         counts, edges, patches = ax.hist(

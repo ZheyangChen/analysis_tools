@@ -2,54 +2,135 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 import h5py
+import tables
 
+def read_hdf5_with_subfields(file_path, key, subfield_map=None, column_list=None):
+    """
+    Read scalar + compound subfields from an HDF5 group using PyTables.
 
-def try_read_hdf_flat_or_structured(name, key):
-    """
-    Attempt to read key from HDF5 file. If structured (fails with pandas), flatten it.
-    Returns: DataFrame with column names prefixed by the key.
-    """
-    try:
-        # Try regular read
-        df = pd.read_hdf(name, key=key)
-    except (ValueError, TypeError):  # Structured compound type
-        df = flatten_hdf5_structured_dataset(name, key)
-    return df.add_prefix(key + '_')
+    Parameters
+    ----------
+    file_path : str
+        Path to the .h5/.hdf file.
+    key : str
+        Group name to read.
+    subfield_map : dict, optional
+        { "OfflineFilterMask": { "OfflineCscd_24": ["condition", "prescale"] } }
+    column_list : list, optional
+        List of scalar + subfield columns to include.
 
+    Returns
+    -------
+    pd.DataFrame
+    """
+    import tables
+    with tables.open_file(file_path) as h5:
+        node = h5.get_node(f"/{key}")
+        arr = node.read()
 
-def merge(name, key_list):
+    df = pd.DataFrame()
+
+    # Extract scalar fields
+    scalar_fields = [n for n in arr.dtype.names if arr.dtype[n].shape == ()]
+    for name in scalar_fields:
+        if (not column_list) or (name in column_list):
+            df[name] = arr[name]
+
+    # Extract compound subfields
+    normalized_key = key.lstrip('/')
+    if subfield_map and normalized_key in subfield_map:
+        #print('checking for subfiled keys')
+        for struct_name, subfields in subfield_map[normalized_key].items():
+            if struct_name not in arr.dtype.names:
+                print(f"⚠️ Compound field '{struct_name}' not found in key '{normalized_key}'")
+                continue
+
+            #print('struct_name: ', struct_name)
+            compound_data = arr[struct_name]
+            #print(f"✅ Reading compound field: {struct_name}")
+            #print(f"    Shape: {compound_data.shape}, dtype: {compound_data.dtype}")
+
+            try:
+                for i, subname in enumerate(subfields):
+                    col_name = f"{struct_name}_{subname}"
+                    if (not column_list) or (col_name in column_list):
+                        df[col_name] = compound_data[:, i]
+            except Exception as e:
+                print(f"❌ Failed to extract subfields from '{struct_name}': {e}")
+
+    return df.add_prefix(key + "_")
+
+def merge(file_path, key_list, key_column_map=None, subfield_map=None):
     """
-    Merge multiple keys from an HDF5 file into one DataFrame,
-    automatically flattening structured compound keys.
+    Merge selected keys from one HDF5 file into a single DataFrame.
+
+    Parameters
+    ----------
+    file_path : str
+        Path to HDF5 file.
+    key_list : list
+        Keys to read.
+    key_column_map : dict, optional
+        {key: [columns]} to keep.
+    subfield_map : dict, optional
+        {key: {compound: [subfields]}} to extract from structured data.
+
+    Returns
+    -------
+    pd.DataFrame
     """
-    merged = try_read_hdf_flat_or_structured(name, key_list[0])
-    for key in key_list[1:]:
+    merged = None
+    for key in key_list:
         try:
-            df = try_read_hdf_flat_or_structured(name, key)
-            merged = merged.join(df, how='inner')
+            df = read_hdf5_with_subfields(
+                file_path,
+                key,
+                subfield_map=subfield_map,
+                column_list=key_column_map.get(key) if key_column_map else None
+            )
+            merged = df if merged is None else merged.join(df, how="inner")
         except Exception as e:
-            print(f"Skipping key '{key}' due to error: {e}")
+            print(f"Skipping key '{key}' in {file_path}: {e}")
     return merged
 
-
-def flatten_hdf5_structured_dataset(file_path, key):
+def flatten_hdf5_structured_dataset(file_path, key, subfield_map=None):
     """
     Flatten a structured HDF5 dataset into a pandas DataFrame.
+
+    Parameters
+    ----------
+    file_path : str or Path
+        Path to the HDF5 file.
+    key : str
+        HDF5 dataset key.
+    subfield_map : dict, optional
+        If provided, only extract listed subfields from compound columns.
+        Format: {"compound_column": ["subfield1", "subfield2", ...]}
+
+    Returns
+    -------
+    pd.DataFrame
     """
     with h5py.File(file_path, 'r') as f:
         data = f[key][:]
 
     flattened = {}
+    subfield_spec = subfield_map.get(key, {}) if subfield_map else {}
+
     for name in data.dtype.names:
         field = data[name]
-        if field.ndim == 1:
+        if field.dtype.fields is None:
             flattened[name] = field
         else:
-            for i in range(field.shape[1]):
-                flattened[f'{name}_{i}'] = field[:, i]
+            selected_subfields = subfield_spec.get(name, field.dtype.names)
+            for subname in selected_subfields:
+                if subname in field.dtype.names:
+                    flattened[f"{name}_{subname}"] = field[subname]
+                else:
+                    print(f"Warning: subfield '{subname}' not found in '{name}' under '{key}'")
 
-    df = pd.DataFrame(flattened)
-    return df
+    return pd.DataFrame(flattened)
+
 
 def split_hdf_key(
     hdf_path: Path,

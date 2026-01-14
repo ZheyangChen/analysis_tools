@@ -73,6 +73,6 @@ for id in id_list:
         print(f'Running code for {indir_year}')
         subprocess.run(['python','merge_main.py','-i',indir_year,'-o',outdir,'-convert','-m','-isdata'])
     else:
-        #subprocess.run(['python','merge_main.py','-i',indir,'-o',outdir,'-convert','-id',id,'-m'])
-        subprocess.run(['python','merge_main.py','-i',indir,'-o',outdir,'-id',id,'-m'])
+        subprocess.run(['python','merge_main.py','-i',indir,'-o',outdir,'-convert','-id',id,'-m'])
+        #subprocess.run(['python','merge_main.py','-i',indir,'-o',outdir,'-id',id,'-m'])
     #subprocess.run(['python','merge_main.py','-i',indir,'-o',outdir,'-id',str(id),'-convert','-split_key','-m'])

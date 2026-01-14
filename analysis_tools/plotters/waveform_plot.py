@@ -9,16 +9,17 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm, Normalize
 
 from icecube import dataio, dataclasses, icetray
-from icecube.icetray import OMKey, I3Frame
+from icecube.icetray import OMKey, I3Frame, I3Units
 
+from icecube import dataio
+from icecube.icetray import I3Frame
+from icecube.dataclasses import I3Geometry, I3Calibration
 
-
-
-
-def _load_calibration(i3_path: str, gcd_mode: str = "mc", gcd_file: str | None = None):
+def load_geometry_and_calibration(i3_path: str, gcd_mode: str = "mc", gcd_file: Optional[str] = None) -> Tuple[I3Geometry, I3Calibration, str]:
     """
-    Returns (cali, gcd_file). Uses find_data_gcd(i3_path) automatically for DATA
-    when gcd_file is not provided.
+    Returns (geo, cali, gcd_file). If no gcd_file is given, it will auto-detect:
+    - For MC: hardcoded path.
+    - For Data: uses find_data_gcd(i3_path).
     """
     if gcd_file is None:
         if gcd_mode == "mc":
@@ -29,22 +30,30 @@ def _load_calibration(i3_path: str, gcd_mode: str = "mc", gcd_file: str | None =
                 raise FileNotFoundError("no MC GCD found")
             gcd_file = cand[-1]
         else:
-            # ←—— This is the only change you needed
-            gcd_file = find_data_gcd(i3_path)
+            from analysis_tools.utils.file_search import find_gcd_for_i3
+            gcd_file = find_gcd_for_i3(i3_path)
 
-    gf = dataio.I3File(gcd_file)
+    geo = None
     cali = None
-    while gf.more():
-        fr = gf.pop_frame()
+    f = dataio.I3File(gcd_file)
+    while f.more():
+        fr = f.pop_frame()
         if fr.Stop == I3Frame.Calibration and "I3Calibration" in fr:
             cali = fr["I3Calibration"]
+        elif fr.Stop == I3Frame.Geometry and "I3Geometry" in fr:
+            geo = fr["I3Geometry"]
+        if geo and cali:
             break
-    gf.close()
+    f.close()
+
     if cali is None:
         raise RuntimeError(f"no I3Calibration found in GCD file: {gcd_file}")
-    return cali, gcd_file
+    if geo is None:
+        raise RuntimeError(f"no I3Geometry found in GCD file: {gcd_file}")
 
-from analysis_tools.utils.file_search import find_files_for_runs
+    return geo, cali, gcd_file
+    
+from analysis_tools.utils.file_search import find_i3_files
 
 
 def plot_event_pulses(
@@ -76,6 +85,10 @@ def plot_event_pulses(
     save_dir: Optional[str] = None,
     gcd_mode: Literal["mc","data"] = "mc",
     gcd_file: Optional[str] = None,
+    i3_path: Optional[str] = None,
+    dom_selection: Literal["bright", "nearest"] = "bright",
+    vertex_key: str = "cscdSBU_MonopodFit4_noDC",
+    nearest_dom_count: int = 10,
 ):
     """
     2D time vs DOM pulse map for events specified in a DataFrame.
@@ -85,7 +98,17 @@ def plot_event_pulses(
     """
 
     # 1) Attach i3_path via your finder (must provide an 'i3_path' column)
-    df_paths = find_files_for_runs(df, master_dir, run_col=run_col, return_as="dataframe")
+    if i3_path:
+    # Direct I3 input mode
+        df_paths = pd.DataFrame({
+            run_col: [run_id],
+            event_col: [event_id],
+            "i3_path": [i3_path]
+        })
+    else:
+        # Standard mode: resolve from master_dir
+        df_paths = find_i3_files(df, master_dir, run_col=run_col,mode = gcd_mode, return_as="dataframe")
+        
     if "i3_path" not in df_paths.columns:
         raise RuntimeError("find_files_for_runs must return a DataFrame with an 'i3_path' column")
 
@@ -108,7 +131,7 @@ def plot_event_pulses(
         # ----- GCD calibration -----
         gcd_to_use = gcd_file
         if gcd_to_use is None:
-            if gcd_mode == "mc":
+            if gcd_mode.lower() == "mc":
                 base = "/cvmfs/icecube.opensciencegrid.org/data/GCD/"
                 patt = os.path.join(base, "GeoCalibDetectorStatus_AVG_55697-57531_PASS2_SPE_withScaledNoise.i3.gz")
                 found = sorted(glob.glob(patt))
@@ -117,7 +140,8 @@ def plot_event_pulses(
                     continue
                 gcd_to_use = found[-1]
             else:
-                gcd_to_use = find_data_gcd(i3_path)
+                from analysis_tools.utils.file_search import find_gcd_for_i3
+                gcd_to_use = find_gcd_for_i3(i3_path)
 
         gf = dataio.I3File(gcd_to_use)
         cali = None
@@ -127,6 +151,18 @@ def plot_event_pulses(
                 cali = fr["I3Calibration"]
                 break
         gf.close()
+        # ✅ Load geometry from GCD (needed for nearest-DOM selection)
+        gf = dataio.I3File(gcd_to_use)
+        geo = None
+        while gf.more():
+            fr = gf.pop_frame()
+            if fr.Stop == I3Frame.Geometry and "I3Geometry" in fr:
+                geo = fr["I3Geometry"]
+                break
+        gf.close()
+        if geo is None:
+            print(f"[skip] no I3Geometry in GCD for run={rid}")
+            continue
         if cali is None:
             print(f"[skip] no I3Calibration in GCD for run={rid}")
             continue
@@ -256,23 +292,57 @@ def plot_event_pulses(
         if string is not None:
             _plot_for_string(string, dom_range)
         else:
-            if "BrightDOMs" not in phys:
-                print("[skip] no BrightDOMs and string=None")
-                continue
-
-            # group by string from BrightDOMs
-            str_to_doms: Dict[int, list] = {}
-            for om in phys["BrightDOMs"]:
-                str_to_doms.setdefault(om.string, []).append(om.om)
-
             pm = dataclasses.I3RecoPulseSeriesMap.from_frame(phys, pulse_key)
-            # For each listed string, widen to ALL hit DOMs (not just those listed)
-            for s in str_to_doms:
-                hit_doms = [om[0][1] for om in pm if om[0][0] == s]
-                if not hit_doms:
+        
+            if dom_selection == "bright":
+                if "BrightDOMs" not in phys:
+                    print("[skip] no BrightDOMs and string=None")
                     continue
-                dr0, dr1 = min(hit_doms), max(hit_doms) + 1
-                _plot_for_string(s, (dr0, dr1))
+        
+                str_to_doms: Dict[int, list] = {}
+                for om in phys["BrightDOMs"]:
+                    str_to_doms.setdefault(om.string, []).append(om.om)
+        
+                for s in str_to_doms:
+                    hit_doms = [om[0][1] for om in pm if om[0][0] == s]
+                    if not hit_doms:
+                        continue
+                    dr0, dr1 = min(hit_doms), max(hit_doms) + 1
+                    _plot_for_string(s, (dr0, dr1))
+        
+            elif dom_selection == "nearest":
+                if vertex_key not in phys:
+                    print(f"[skip] no vertex '{vertex_key}' in frame")
+                    continue
+        
+                vertex_pos = phys[vertex_key].pos
+                x0, y0, z0 = vertex_pos.x, vertex_pos.y, vertex_pos.z
+        
+                # Build a list of (distance, OMKey)
+                dist_om_pairs = []
+                for om, pulses in pm.items():
+                    if not pulses:
+                        continue
+                    pos = geo.omgeo[om].position
+                    dx, dy, dz = pos.x - x0, pos.y - y0, pos.z - z0
+                    dist2 = dx*dx + dy*dy + dz*dz
+                    dist_om_pairs.append((dist2, om))
+        
+                if not dist_om_pairs:
+                    print(f"[skip] no pulses to find nearest DOMs")
+                    continue
+        
+                dist_om_pairs.sort()
+                selected = dist_om_pairs[:nearest_dom_count]
+        
+                # Group selected by string
+                str_to_doms: Dict[int, list] = {}
+                for _, om in selected:
+                    str_to_doms.setdefault(om.string, []).append(om.om)
+        
+                for s, doms in str_to_doms.items():
+                    dr0, dr1 = min(doms), max(doms) + 1
+                    _plot_for_string(s, (dr0, dr1))
 
 
 def plot_dom_pulses(
@@ -292,11 +362,15 @@ def plot_dom_pulses(
     title: Optional[str] = None,
     show: bool = True,
     save_dir: Optional[str] = None,
-    gcd_mode: str = "mc",                 # "mc" or "data"
+    gcd_mode: str = "mc",
     gcd_file: Optional[str] = None,
+    i3_path: Optional[str] = None,
     xlim: Optional[Tuple[float, float]] = None,
     ylim: Optional[Tuple[float, float]] = None,
     time_window: Optional[float] = None, 
+    dom_selection: Literal["bright", "nearest"] = "bright",
+    vertex_key: str = "cscdSBU_MonopodFit4_noDC",
+    nearest_dom_count: int = 10,
 ):
     """
     Make per-DOM pulse plots (charge vs time) for events listed in a DataFrame.
@@ -305,7 +379,23 @@ def plot_dom_pulses(
     """
 
     # Resolve I3 file paths
-    df_paths = find_files_for_runs(df, master_dir, run_col=run_col, return_as="dataframe")
+    if i3_path:
+        # Direct I3 input mode
+        df_paths = pd.DataFrame({
+            run_col: [run_id],
+            event_col: [event_id],
+            "i3_path": [i3_path]
+        })
+    else:
+        # Only use the relevant run subset from df to avoid full scan
+        if run_id is not None:
+            df_sub = df[df[run_col] == run_id]
+        else:
+            df_sub = df
+
+        df_paths = find_i3_files(df_sub, master_dir, run_col=run_col, mode=gcd_mode, return_as="dataframe")
+
+        
     if "i3_path" not in df_paths.columns:
         raise RuntimeError("find_files_for_runs must return an 'i3_path' column")
 
@@ -316,6 +406,7 @@ def plot_dom_pulses(
         rows = df_paths
 
     # Iterate events
+    gcd_cache = {}
     for _, row in rows[[run_col, event_col, "i3_path"]].iterrows():
         i3_path = row["i3_path"]
         rid     = int(row[run_col])
@@ -337,17 +428,19 @@ def plot_dom_pulses(
                     continue
                 gcd_to_use = found[-1]
             else:
-                gcd_to_use = find_data_gcd(i3_path)
+                from analysis_tools.utils.file_search import find_gcd_for_i3
+                gcd_to_use = find_gcd_for_i3(i3_path)
 
         # Load calibration
-        gf = dataio.I3File(gcd_to_use)
-        cali = None
-        while gf.more():
-            fr = gf.pop_frame()
-            if fr.Stop == I3Frame.Calibration and "I3Calibration" in fr:
-                cali = fr["I3Calibration"]
-                break
-        gf.close()
+        cache_key = gcd_file or i3_path
+        if cache_key not in gcd_cache:
+            geo, cali, used_gcd = load_geometry_and_calibration(i3_path, gcd_mode=gcd_mode, gcd_file=gcd_file)
+            gcd_cache[cache_key] = (geo, cali, used_gcd)
+        geo, cali, gcd_to_use = gcd_cache[cache_key]
+
+        if geo is None:
+            print(f"[skip] no I3Geometry in GCD for run={rid}")
+            continue
         if cali is None:
             print(f"[skip] no I3Calibration in GCD for run={rid}")
             continue
@@ -371,6 +464,7 @@ def plot_dom_pulses(
 
         # === DOM plotting (your original with time_window support) ===
         def _plot_for_dom(omkey: OMKey):
+            pm = dataclasses.I3RecoPulseSeriesMap.from_frame(phys, pulse_key)
             pulses = pm.get(omkey, [])
             if not pulses:
                 print(f"No pulses on OM({omkey.string},{omkey.om})")
@@ -385,15 +479,16 @@ def plot_dom_pulses(
             arr_t = np.array(ts)
             arr_q = np.array(qs)
 
+
             # Sort by time
             order = np.argsort(arr_t)
             arr_t = arr_t[order]
             arr_q = arr_q[order]
-
+            
             # Relative suppression threshold (1% of total charge)
             total_q = float(np.sum(arr_q))
             rel_thr = 0.01 * total_q if total_q > 0 else 0.0
-
+            
             for i in range(len(arr_t)):
                 t_cut = arr_t[i]
                 mask  = arr_t >= t_cut
@@ -408,7 +503,7 @@ def plot_dom_pulses(
 
             fig, ax = plt.subplots(figsize=figsize)
             ax.plot(arr_t, arr_q, linestyle='-', lw=1)
-
+            
             # x-limits priority: explicit xlim > time_window > full data span
             if xlim is not None:
                 ax.set_xlim(*xlim)
@@ -416,7 +511,8 @@ def plot_dom_pulses(
                 t0 = float(arr_t.min())
                 ax.set_xlim(t0, t0 + float(time_window))
             else:
-                ax.set_xlim(float(arr_t.min()), float(arr_t.max()))
+                duration = float(arr_t.max()) - float(arr_t.min())
+                ax.set_xlim(float(arr_t.min()), float(arr_t.min()) + min(duration, 600.0))
 
             if ylim is not None:
                 ax.set_ylim(*ylim)
@@ -438,9 +534,46 @@ def plot_dom_pulses(
         # Dispatch: specific OM or BrightDOMs list
         if string is not None and dom is not None:
             _plot_for_dom(OMKey(string, dom))
-        else:
+        
+        elif dom_selection == "bright":
             if "BrightDOMs" not in phys:
                 print("[skip] no 'BrightDOMs' in frame and no (string, dom) provided")
                 continue
             for om in phys["BrightDOMs"]:
                 _plot_for_dom(OMKey(om.string, om.om))
+        
+        elif dom_selection == "nearest":
+            if vertex_key not in phys:
+                print(f"[skip] no vertex '{vertex_key}' in frame")
+                continue
+
+            vertex_pos = phys[vertex_key].pos
+            x0, y0, z0 = vertex_pos.x, vertex_pos.y, vertex_pos.z
+
+            print(f"🔍 Run {rid} Event {eid} using vertex '{vertex_key}':")
+            print(f"    x = {x0:.2f}, y = {y0:.2f}, z = {z0:.2f}")
+
+            pm = dataclasses.I3RecoPulseSeriesMap.from_frame(phys, pulse_key)
+            dist_om_pairs = []
+            for om, pulses in pm.items():
+                if not pulses:
+                    continue
+                pos = geo.omgeo[om].position
+                dx, dy, dz = pos.x - x0, pos.y - y0, pos.z - z0
+                dist2 = dx * dx + dy * dy + dz * dz
+                dist_om_pairs.append((dist2, om))
+
+            if not dist_om_pairs:
+                print(f"[skip] no pulses to find nearest DOMs")
+                continue
+
+            dist_om_pairs.sort()
+            selected = dist_om_pairs[:nearest_dom_count]
+
+            print(f"     Nearest {nearest_dom_count} DOMs with pulses:")
+            for dist2, om in selected:
+                dist = np.sqrt(dist2)
+                print(f"      OM({om.string:2d},{om.om:02d})  →  {dist:.1f} m")
+
+            for _, om in selected:
+                _plot_for_dom(om)

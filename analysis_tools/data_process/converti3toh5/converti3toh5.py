@@ -92,7 +92,7 @@ def converti3toh5(infile,outfile,ismgun,isdata):
     key1 = ['cscdSBU_MonopodFit4_noDC','cscdSBU_MonopodFit4_noDCFitParams','cscdSBU_MonopodFit4_noDC_Delay_ice','cscdSBU_MaxQtotRatio_SplitInIcePulses','cscdSBU_MCTruth','I3EventHeader','I3MCWeightDict','cscdSBU_AtmWeight_Conv','cscdSBU_AtmWeight_Prompt','cscdSBU_AtmWeight_Prompt_PassRate','cscdSBU_AtmWeight_Conv_PassRate', 'cscdSBU_Qtot_HLC', 'CscdL3_CascadeLlhVertexFit','cscdSBU_MaxQtotRatio_HLC','cscdSBU_VetoDepthFirstHit']
     tau_keys = ['Cascade1_vis_truth_tau','Cascade2_vis_truth_tau','MCTruth_Cascade_Distance','MCTruth_Tau_Asymmetry','TrueTau','cc']
     key1.extend(tau_keys)
-    taupede_keys = ['Taupede_spice3','Taupede_spice3FitParams','Taupede_spice3Particles','Taupede1_spice3Particles','Taupede2_spice3Particles','Taupede_Distance','Taupede_Asymmetry','TauMonoDiff_rlogl','NuTaudecaytype']
+    taupede_keys = ['Taupede1_spice3Particles','Taupede2_spice3Particles','Taupede_Distance','Taupede_Asymmetry','TauMonoDiff_rlogl','NuTaudecaytype']
     key1.extend(taupede_keys)
     add_keys = ['CVMultiplicity','CVStatistics','cscdSBU_VertexRecoDist_CscdLLh']
     key1.extend(add_keys)
@@ -100,7 +100,7 @@ def converti3toh5(infile,outfile,ismgun,isdata):
     depth_name_suffix = '_v1_gcd'
     snowstorm_keys = ['SnowstormParameterDict','PolyplopiaPrimary','cscdSBU_AtmWeight_Prompt_berss','cscdSBU_L4StartingTrackHLC_cscdSBU_MonopodFit4_OfflinePulsesHLC_noDCVetoCharge','cscdSBU_LE_bdt_cascade','cscdSBU_LE_bdt_hybrid','cscdSBU_LE_bdt_track','cscdSBU_LE_bdt_input','cscdSBU_MCPrimary','cscdSBU_VetoMaxDomChargeOM',"penetrating_depth"+depth_name_suffix]
     key1.extend(snowstorm_keys)
-    additional_treatments_keys = ['TotalWeight_glashowcorrection','Energy_tau_lepton','Energy_tau_decayproduct','Number_tau_decaypions','Number_tau_decaypi0','Energy_tau_decaynutau','Charmtype']
+    additional_treatments_keys = ['TotalWeight_glashowcorrection','Energy_tau_lepton','Energy_tau_decayproduct','Number_tau_decaypions','Number_tau_decaypi0','Energy_tau_decaynutau','Charmtype','TrueCharm']
     key1.extend(additional_treatments_keys)
     Taupede_name1 = 'Taupede_newmonoseed'
     Taupede_name2 = 'New_Taupede'
@@ -137,6 +137,7 @@ def converti3toh5(infile,outfile,ismgun,isdata):
                              'Taupede_lengthbound_500',
                              'Taupede_tianlu_step',
                              'Taupede_ftp',
+                             'Taupede_spice3',
                              ]
     for Taupede_name3 in Taupede_name_add_list:
         testing_keys = [Taupede_name3,
@@ -171,8 +172,9 @@ def converti3toh5(infile,outfile,ismgun,isdata):
             print('Running convert for data')
         else:
             tray.AddModule(penetrating_depth, gcd=gcd_file,depth_name_suffix='_v1_gcd')
-            tray.AddSegment(add_glashow,'glashow')
-            tray.AddSegment(add_tau_decay_mode,"check_tau_decay")
+            #tray.AddSegment(add_glashow,'glashow')
+            #tray.AddSegment(add_tau_decay_mode,"check_tau_decay")
+            print('Running conversion for nugen')
         
         print('outfile name: ',outfile)
 

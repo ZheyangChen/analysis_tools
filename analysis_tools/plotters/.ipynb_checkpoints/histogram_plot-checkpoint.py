@@ -5,54 +5,55 @@ import pandas as pd
 import matplotlib.gridspec as gridspec
 from math import sqrt
 
+from typing import Sequence, Union, Dict, Any
+# histogram_plot.py
 
-
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-
-def plot_histograms(data_input, plotvar, bins,
-                    weights_map='weight', normalized=False, histtype='step',
-                    xscale=None, yscale='log',
-                    xlabel=None, ylabel=None, title=None,
-                    legend_loc='best', xlim=None, ylim=None,
-                    colors=None, labels=None,
-                    show=True, save_path=None):
+def plot_histograms(
+    data_input: Union[pd.DataFrame, Sequence[pd.DataFrame], Dict[str, pd.DataFrame]],
+    plotvar:    Union[str, Sequence[str]],
+    bins,
+    weights_map: Union[str, Dict[str, str]] = 'weight',
+    normalized:  bool   = False,
+    histtype:    str    = 'step',
+    xscale:      str    = None,
+    yscale:      str    = 'log',
+    xlabel:      str    = None,
+    ylabel:      str    = None,
+    title:       str    = None,
+    legend_loc:  str    = 'best',
+    xlim:        tuple  = None,
+    ylim:        tuple  = None,
+    colors:      Union[str, Sequence[str]] = None,
+    linestyles:  Union[str, Sequence[str]] = None,
+    labels:      Sequence[str] = None,
+    ax:          plt.Axes = None,
+    vlines:      Sequence[float] = None,
+    hlines:      Sequence[float] = None,
+    vline_kwargs: Dict[str, Any] = None,
+    hline_kwargs: Dict[str, Any] = None,
+    show:        bool   = True,
+    save_path:   str    = None,
+    errorbar:    bool   = False
+) -> (plt.Figure, plt.Axes):
     """
-    Two modes:
-      • Multi‑DF mode: data_input=dict/list of DataFrames, plotvar=str
-      • Multi‑column mode: data_input=DataFrame, plotvar=list of str
-
-    Parameters
-    ----------
-    data_input : dict of DataFrames, list of DataFrames, or single DataFrame
-    plotvar    : str or list of str
-    bins       : array-like
-    weights_map: str or dict (in multi‑DF mode)
-    colors     : single matplotlib color or list of colors
-    labels     : legend labels (list of same length as histograms)
+    Plot one or more histograms on the same Axes, with optional error bars
+    drawn at the top of each bin in the same color as its histogram.
     """
-    # --- Figure out which mode we're in ---
-    if isinstance(data_input, dict) or isinstance(data_input, list):
-        # Multi‑DF mode: plotvar must be a single column name
+    # — determine dfs & plotvars (unchanged) —
+    if isinstance(data_input, (dict, list)):
         if isinstance(data_input, list):
             data_dict = {f'df_{i}': df for i, df in enumerate(data_input)}
         else:
             data_dict = data_input
-
         if isinstance(plotvar, (list, tuple)):
             raise ValueError("When data_input is dict/list, plotvar must be a single column name.")
-
-        dfs      = [data_dict[k] for k in data_dict]
-        plotvars = [plotvar] * len(dfs)
-        # default labels = dict keys or df_i
+        dfs      = list(data_dict.values())
+        plotvars = [plotvar]*len(dfs)
         if labels is None:
             labels = list(data_dict.keys())
-
     elif isinstance(data_input, pd.DataFrame):
-        # Single-DF mode: plotvar can be str or list
         if isinstance(plotvar, (list, tuple)):
-            dfs      = [data_input] * len(plotvar)
+            dfs      = [data_input]*len(plotvar)
             plotvars = list(plotvar)
             if labels is None:
                 labels = list(plotvar)
@@ -62,58 +63,121 @@ def plot_histograms(data_input, plotvar, bins,
             if labels is None:
                 labels = [plotvar]
     else:
-        raise ValueError("data_input must be a DataFrame, a list of DataFrames, or a dict of DataFrames.")
+        raise ValueError("data_input must be a DataFrame, list, or dict of DataFrames")
 
     n = len(dfs)
 
-    # --- Normalize colors and labels ---
+    # — normalize colors & linestyles —
     if colors is None:
-        colors = [None] * n
-    elif not isinstance(colors, (list, tuple)):
-        colors = [colors] * n
+        colors = [None]*n
+    elif isinstance(colors, str):
+        colors = [colors]*n
     elif len(colors) != n:
-        raise ValueError(f"You passed {len(colors)} colors for {n} histograms.")
+        raise ValueError(f"{n} histograms but {len(colors)} colors provided")
 
-    if labels is None or len(labels) != n:
-        raise ValueError(f"You must provide exactly {n} labels for the legend.")
+    if linestyles is None:
+        linestyles = ['solid']*n
+    elif isinstance(linestyles, str):
+        linestyles = [linestyles]*n
+    elif len(linestyles) != n:
+        raise ValueError(f"{n} histograms but {len(linestyles)} linestyles provided")
 
-    # --- Plotting ---
-    plt.figure()
-    for df, var, color, lab in zip(dfs, plotvars, colors, labels):
+    if len(labels) != n:
+        raise ValueError(f"Must provide exactly {n} labels")
+
+    # — setup Axes —
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = ax.figure
+
+    # — plot each histogram & optional errorbars —
+    for df, var, col, ls, lab in zip(dfs, plotvars, colors, linestyles, labels):
         # determine weights
-        if isinstance(weights_map, str):
-            w = df[weights_map]
-        else:
+        # determine weights
+        if weights_map is None:
+            w = None
+        elif isinstance(weights_map, str):
+            if weights_map in df.columns:
+                w = df[weights_map]
+            else:
+                raise ValueError(f"Weight column '{weights_map}' not found in DataFrame")
+        elif isinstance(weights_map, dict):
             wspec = weights_map.get(lab)
             if wspec is None:
-                raise ValueError(f"No weight specification for label '{lab}'.")
+                raise ValueError(f"No weight for label '{lab}' in weights_map")
             w = df[wspec].sum(axis=1) if isinstance(wspec, list) else df[wspec]
+        else:
+            raise ValueError("weights_map must be None, a string, or a dict")
 
-        plt.hist(df[var], bins=bins, histtype=histtype,
-                 weights=w, density=normalized,
-                 color=color, label=lab)
+        # draw histogram
+        counts, edges, patches = ax.hist(
+            df[var],
+            bins=bins,
+            histtype=histtype,
+            weights=w,
+            density=normalized,
+            color=col,
+            linestyle=ls,
+            label=lab
+        )
 
-    if xscale: plt.xscale(xscale)
-    if yscale: plt.yscale(yscale)
-    if xlim:   plt.xlim(xlim)
-    if ylim:   plt.ylim(ylim)
+        if errorbar:
+            # pick the exact color used by the histogram
+            if col is not None:
+                ecolor = col
+            else:
+                # extract from the first patch
+                if isinstance(patches, (list, tuple)):
+                    ecolor = patches[0].get_edgecolor()
+                else:
+                    ec = patches.get_edgecolor()
+                    ecolor = ec[0] if isinstance(ec, np.ndarray) else ec
 
-    # axis labels & title
-    is_multi = len(plotvars) > 1
-    plt.xlabel(xlabel or ( "" if is_multi else plotvars[0] ))
+            # compute ±√(Σw²)
+            sumw2, _ = np.histogram(df[var], bins=bins, weights=w**2)
+            errs = np.sqrt(sumw2)
+            centers = 0.5*(edges[:-1] + edges[1:])
+            # overlay errorbars at the bin tops
+            ax.errorbar(
+                centers, counts,
+                yerr=errs,
+                fmt='none',
+                ecolor=ecolor,
+                capsize=3,
+                alpha=0.8
+            )
+
+    # — apply scales & limits —
+    if xscale: ax.set_xscale(xscale)
+    if yscale: ax.set_yscale(yscale)
+    if xlim:   ax.set_xlim(xlim)
+    if ylim:   ax.set_ylim(ylim)
+
+    # — labels, legend, etc. —
+    ax.set_xlabel(xlabel or "")
     default_ylabel = 'Probability Density' if normalized else 'Rate per Year'
-    plt.ylabel(ylabel or default_ylabel)
-    plt.title(title or "")
+    ax.set_ylabel(ylabel or default_ylabel)
+    ax.set_title(title or "")
+    ax.legend(loc=legend_loc)
 
-    plt.legend(loc=legend_loc)
+    # — optional vlines/hlines —
+    vline_kwargs = vline_kwargs or {}
+    hline_kwargs = hline_kwargs or {}
+    if vlines:
+        for x0 in vlines:
+            ax.axvline(x0, **vline_kwargs)
+    if hlines:
+        for y0 in hlines:
+            ax.axhline(y0, **hline_kwargs)
 
+    # — save & show —
     if save_path:
-        plt.savefig(save_path)
+        fig.savefig(save_path, bbox_inches='tight')
     if show:
         plt.show()
-    else:
-        plt.close()
-        
+
+    return fig, ax
 
 def compute_hist_with_errors(data, bins, weight, transform_func=None):
     """
@@ -143,13 +207,56 @@ def plot_stacked_hist_with_ratio(hist_data, errorbar_data, plotvar, bins,
                                  xlabel=None, ylabel_hist='Rate per Year', ylabel_ratio='Ratio',
                                  title=None, legend_loc='best',
                                  xlim=None, ylim_hist=None, ylim_ratio=None,
-                                 colors=None, errorbar_label='Data', ratio_label='Ratio (MC/Data)'):
+                                 colors=None, errorbar_label='Data', ratio_label='Ratio (Data/MC)',
+                                 hist_labels=None):
+    """
+    Plot stacked MC histogram with errorbar data overlay and data/MC ratio.
+
+    Parameters
+    ----------
+    hist_data : DataFrame, list of DataFrames, or dict
+        MC histograms.
+    errorbar_data : DataFrame
+        Data points to overlay with error bars.
+    plotvar : str
+        Variable to plot.
+    bins : int or sequence
+        Histogram bins.
+    hist_weight : str
+        Column name for MC weights.
+    errorbar_weight : str
+        Column name for data weights.
+    transform_func : callable, optional
+        Function to transform x values.
+    xscale, yscale : str
+        Axis scaling (e.g., 'linear', 'log').
+    xlabel, ylabel_hist, ylabel_ratio, title : str
+        Plot labels.
+    legend_loc : str
+        Legend location.
+    xlim, ylim_hist, ylim_ratio : tuple
+        Axis limits.
+    colors : list
+        Colors for stacked components.
+    errorbar_label : str
+        Label for the errorbar data.
+    ratio_label : str
+        Label for the ratio plot.
+    hist_labels : list of str, optional
+        Custom labels for the hist_data if it's a list or single DataFrame.
+    """
+
     # Convert hist_data to dict if needed.
     if isinstance(hist_data, pd.DataFrame):
-        hist_data = {'data': hist_data}
+        label = hist_labels[0] if hist_labels else 'MC'
+        hist_data = {label: hist_data}
     elif isinstance(hist_data, list):
-        hist_data = {f'df_{i}': df for i, df in enumerate(hist_data)}
-    
+        if hist_labels:
+            assert len(hist_labels) == len(hist_data), "hist_labels length must match hist_data"
+            hist_data = {label: df for label, df in zip(hist_labels, hist_data)}
+        else:
+            hist_data = {f'df_{i}': df for i, df in enumerate(hist_data)}
+        
     # Create figure and manually position axes for perfect alignment.
     fig = plt.figure(figsize=(8, 6))
     ax_hist = fig.add_axes([0.1, 0.3, 0.85, 0.6])
@@ -193,12 +300,13 @@ def plot_stacked_hist_with_ratio(hist_data, errorbar_data, plotvar, bins,
     mask = hist_errorbar > 0
     ratio = np.full_like(combined_hist, np.nan, dtype=float)
     ratio_error = np.full_like(combined_hist, np.nan, dtype=float)
-    ratio[mask] = combined_hist[mask] / hist_errorbar[mask]
+    ratio[mask] = hist_errorbar[mask] / combined_hist[mask]
     rel_error_combined = np.zeros_like(combined_hist, dtype=float)
     rel_error_errorbar = np.zeros_like(hist_errorbar, dtype=float)
     rel_error_combined[mask] = combined_error[mask] / combined_hist[mask]
     rel_error_errorbar[mask] = error[mask] / hist_errorbar[mask]
-    ratio_error[mask] = ratio[mask] * np.sqrt(rel_error_combined[mask]**2 + rel_error_errorbar[mask]**2)
+    #ratio_error[mask] = ratio[mask] * np.sqrt(rel_error_combined[mask]**2 + rel_error_errorbar[mask]**2)
+    ratio_error[mask] = ratio[mask] * (error[mask] / hist_errorbar[mask])
     
     ax_ratio.step(bin_centers, ratio, where='mid', label=ratio_label)
     ax_ratio.errorbar(bin_centers, ratio, yerr=ratio_error, fmt='k.', elinewidth=1, ms=3)
@@ -229,5 +337,5 @@ def plot_stacked_hist_with_ratio(hist_data, errorbar_data, plotvar, bins,
     ax_hist.legend(loc=legend_loc)
     ax_ratio.legend(loc=legend_loc)
     
-    plt.tight_layout()
+    #plt.tight_layout()
     plt.show()

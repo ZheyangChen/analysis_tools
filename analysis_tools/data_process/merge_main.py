@@ -84,6 +84,9 @@ def main():
         else:
             print(f'processing {simprodid}')
             indir = sorted(glob.glob(indir_master+f"/{simprodid}/00*/final_cascade/"))
+            nfiles = len(glob.glob(indir_master+f"/{simprodid}/00*/final_cascade/*.i3.*"))
+            if nfiles == 0:
+                indir = sorted(glob.glob(indir_master+f"/{simprodid}/p0=0.0_p1=0.0_domeff=1.00/00*/final_cascade/"))
             #indir = sorted(glob.glob(indir_master+f"/{simprodid}/p0=0.0_p1=0.0_domeff=1.00/00*/final_cascade/"))
             outdir_final = [(i+'h5file/') for i in indir]
             
@@ -117,6 +120,9 @@ def main():
         if args.simprodid:
             #indir = sorted(glob.glob(indir_master+f"/{simprodid}/00*/final_cascade/h5file/"))
             indir = sorted(glob.glob(indir_master+f"/{simprodid}/*h5file/"))
+            nfiles = len(glob.glob(indir_master+f"/{simprodid}/*h5file/*.h5"))
+            if nfiles == 0:
+                indir = sorted(glob.glob(indir_master+f"/{simprodid}/p0=0.0_p1=0.0_domeff=1.00/00*/final_cascade/h5file/"))
             #indir = sorted(glob.glob(indir_master+f"/{simprodid}/p0=0.0_p1=0.0_domeff=1.00/00*/final_cascade/h5file/"))
             #indir = sorted(glob.glob(indir_master+f"/{simprodid}/0043000-0043999/final_cascade/h5file/"))
             for ind in indir:

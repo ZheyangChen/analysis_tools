@@ -75,7 +75,7 @@ def plot_event_pulses(
     bins: Union[int, Tuple[int,int]] = 20,        # int = time bins; DOM bins auto
     norm: Literal["log","linear"] = "log",
     cmap: str = "viridis",
-    cmin: float = 1.0,
+    cmin: float = 0.5,
     figsize: Tuple[float,float] = (8,4),
     xlabel: str = "Time [ns]",
     ylabel: str = "DOM",
@@ -107,7 +107,12 @@ def plot_event_pulses(
         })
     else:
         # Standard mode: resolve from master_dir
-        df_paths = find_i3_files(df, master_dir, run_col=run_col,mode = gcd_mode, return_as="dataframe")
+        if run_id is not None:
+            df_sub = df[df[run_col] == run_id]
+        else:
+            df_sub = df
+        
+        df_paths = find_i3_files(df_sub, master_dir, run_col=run_col, mode=gcd_mode, return_as="dataframe")
         
     if "i3_path" not in df_paths.columns:
         raise RuntimeError("find_files_for_runs must return a DataFrame with an 'i3_path' column")
@@ -119,6 +124,7 @@ def plot_event_pulses(
         rows = df_paths
 
     # 2) Iterate events
+    fig, ax = None, None
     for _, row in rows[[run_col, event_col, "i3_path"]].iterrows():
         i3_path = row["i3_path"]
         rid     = int(row[run_col])
@@ -143,23 +149,13 @@ def plot_event_pulses(
                 from analysis_tools.utils.file_search import find_gcd_for_i3
                 gcd_to_use = find_gcd_for_i3(i3_path)
 
-        gf = dataio.I3File(gcd_to_use)
-        cali = None
-        while gf.more():
-            fr = gf.pop_frame()
-            if fr.Stop == I3Frame.Calibration and "I3Calibration" in fr:
-                cali = fr["I3Calibration"]
-                break
-        gf.close()
-        # ✅ Load geometry from GCD (needed for nearest-DOM selection)
-        gf = dataio.I3File(gcd_to_use)
-        geo = None
-        while gf.more():
-            fr = gf.pop_frame()
-            if fr.Stop == I3Frame.Geometry and "I3Geometry" in fr:
-                geo = fr["I3Geometry"]
-                break
-        gf.close()
+        cache_key = gcd_file or i3_path
+        if 'gcd_cache' not in locals():
+            gcd_cache = {}
+        if cache_key not in gcd_cache:
+            geo, cali, gcd_to_use = load_geometry_and_calibration(i3_path, gcd_mode=gcd_mode, gcd_file=gcd_file)
+            gcd_cache[cache_key] = (geo, cali, gcd_to_use)
+        geo, cali, gcd_to_use = gcd_cache[cache_key]
         if geo is None:
             print(f"[skip] no I3Geometry in GCD for run={rid}")
             continue
@@ -229,13 +225,13 @@ def plot_event_pulses(
                 if masked.count() == 0:
                     return None
                 vals = masked.compressed()
-                if vals.size and np.all(vals > 0):
-                    vmin = max(vals.min(), 1e-12)
-                    vmax = vals.max()
+                vmin = max(vals.min(), 1e-12) if vals.size else 1e-12
+                vmax = vals.max() if vals.size else 1.0
+            
+                if norm == "log":
                     return LogNorm(vmin=vmin, vmax=vmax)
                 else:
-                    return Normalize(vmin=(vals.min() if vals.size else 0.0),
-                                     vmax=(vals.max() if vals.size else 1.0))
+                    return Normalize(vmin=vmin, vmax=vmax)
         
             # --- choose t0 with prepad ---
             t0 = arr_t.min() - prepad_ns
@@ -285,12 +281,15 @@ def plot_event_pulses(
                 fig.savefig(os.path.join(save_dir, f"run{rid}_evt{eid}_str{s}.png"), bbox_inches="tight")
             if show:
                 plt.show()
-            else:
-                plt.close(fig)
+
+            
+            return fig, ax
 
         # ----- dispatch: specific string vs BrightDOMs groups -----
         if string is not None:
-            _plot_for_string(string, dom_range)
+            result = _plot_for_string(string, dom_range)
+            if result is not None:
+                fig, ax = result
         else:
             pm = dataclasses.I3RecoPulseSeriesMap.from_frame(phys, pulse_key)
         
@@ -308,7 +307,9 @@ def plot_event_pulses(
                     if not hit_doms:
                         continue
                     dr0, dr1 = min(hit_doms), max(hit_doms) + 1
-                    _plot_for_string(s, (dr0, dr1))
+                    result = _plot_for_string(s, (dr0, dr1))
+                    if result is not None:
+                        fig, ax = result
         
             elif dom_selection == "nearest":
                 if vertex_key not in phys:
@@ -342,8 +343,10 @@ def plot_event_pulses(
         
                 for s, doms in str_to_doms.items():
                     dr0, dr1 = min(doms), max(doms) + 1
-                    _plot_for_string(s, (dr0, dr1))
-
+                    result = _plot_for_string(s, (dr0, dr1))
+                    if result is not None:
+                        fig, ax = result
+    return fig, ax
 
 def plot_dom_pulses(
     df: pd.DataFrame,
@@ -528,8 +531,7 @@ def plot_dom_pulses(
                 fig.savefig(out, bbox_inches='tight')
             if show:
                 plt.show()
-            else:
-                plt.close(fig)
+
 
         # Dispatch: specific OM or BrightDOMs list
         if string is not None and dom is not None:

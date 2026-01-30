@@ -403,6 +403,9 @@ def plot_dom_pulses(
     xlabel: str = "Time [ns]",
     ylabel: str = "Charge [p.e.]",
     title: Optional[str] = None,
+    plot_style: Literal["line", "points", "errorbar"] = "line",
+    charge_err_mode: Literal["poisson", "fractional", "none"] = "poisson",
+    charge_err_frac: float = 0.2,
     show: bool = True,
     save_dir: Optional[str] = None,
     gcd_mode: str = "mc",
@@ -548,7 +551,26 @@ def plot_dom_pulses(
                 return
 
             fig, ax = plt.subplots(figsize=figsize)
-            ax.plot(arr_t, arr_q, linestyle='-', lw=1)
+            if plot_style == "line":
+                ax.plot(arr_t, arr_q, linestyle='-', lw=1)
+            elif plot_style == "points":
+                ax.plot(arr_t, arr_q, linestyle='None', marker='o', markersize=3)
+            elif plot_style == "errorbar":
+                if charge_err_mode == "poisson":
+                    yerr = np.sqrt(np.maximum(arr_q, 0.0))
+                elif charge_err_mode == "fractional":
+                    yerr = np.abs(arr_q) * float(charge_err_frac)
+                else:
+                    yerr = None
+                ax.errorbar(
+                    arr_t,
+                    arr_q,
+                    yerr=yerr,
+                    fmt='o',
+                    markersize=3,
+                    elinewidth=1,
+                    capsize=2,
+                )
             
             # x-limits priority: explicit xlim > time_range > full_time_range > time_window > full data span
             if xlim is not None:

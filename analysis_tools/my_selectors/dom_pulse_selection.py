@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Tuple, Literal
+from typing import Dict, Optional, Tuple, Literal, List, Any
 
 import numpy as np
 
@@ -14,13 +14,14 @@ def find_doms_in_time_range(
     atwd_only: bool = True,
     pulse_mode: Optional[Literal["atwd", "fadc", "both"]] = None,
     lc_mode: Literal["any", "lc", "nolc"] = "any",
+    include_pulses: bool = False,
     min_pulse_count: Optional[int] = None,
     max_pulse_count: Optional[int] = None,
     min_total_charge: Optional[float] = None,
     max_total_charge: Optional[float] = None,
     min_max_pulse_charge: Optional[float] = None,
     max_max_pulse_charge: Optional[float] = None,
-) -> Dict[OMKey, Dict[str, float]]:
+) -> Dict[OMKey, Dict[str, Any]]:
     """
     Find DOMs with pulses in a custom time range.
 
@@ -29,6 +30,7 @@ def find_doms_in_time_range(
     If pulse_mode is provided, it overrides atwd_only.
 
     Returns a dict: OMKey -> {"count": int, "total_charge": float, "max_charge": float}
+    If include_pulses is True, adds "pulses": [{"time": float, "charge": float, "width": Optional[float]}, ...]
     """
 
     t0, t1 = float(time_range[0]), float(time_range[1])
@@ -45,8 +47,9 @@ def find_doms_in_time_range(
         if not pulses:
             continue
 
-        ts = []
-        qs = []
+        ts: List[float] = []
+        qs: List[float] = []
+        widths: List[Optional[float]] = []
         for p in pulses:
             flags = p.flags
             if pulse_mode == "atwd" and not (flags & dataclasses.I3RecoPulse.PulseFlags.ATWD):
@@ -65,6 +68,7 @@ def find_doms_in_time_range(
             if t0 <= p.time <= t1:
                 ts.append(p.time)
                 qs.append(p.charge)
+                widths.append(getattr(p, "width", None))
 
         if not ts:
             continue
@@ -86,11 +90,18 @@ def find_doms_in_time_range(
         if max_max_pulse_charge is not None and max_charge > max_max_pulse_charge:
             continue
 
-        out[om] = {
+        entry: Dict[str, Any] = {
             "count": count,
             "total_charge": total_charge,
             "max_charge": max_charge,
         }
+        if include_pulses:
+            entry["pulses"] = [
+                {"time": float(t), "charge": float(q), "width": w}
+                for t, q, w in zip(ts, qs, widths)
+            ]
+
+        out[om] = entry
 
     return out
 
@@ -105,6 +116,7 @@ def find_doms_in_time_range_from_i3(
     atwd_only: bool = True,
     pulse_mode: Optional[Literal["atwd", "fadc", "both"]] = None,
     lc_mode: Literal["any", "lc", "nolc"] = "any",
+    include_pulses: bool = False,
     min_pulse_count: Optional[int] = None,
     max_pulse_count: Optional[int] = None,
     min_total_charge: Optional[float] = None,
@@ -141,6 +153,7 @@ def find_doms_in_time_range_from_i3(
         atwd_only=atwd_only,
         pulse_mode=pulse_mode,
         lc_mode=lc_mode,
+        include_pulses=include_pulses,
         min_pulse_count=min_pulse_count,
         max_pulse_count=max_pulse_count,
         min_total_charge=min_total_charge,
@@ -162,6 +175,7 @@ if __name__ == "__main__":
     parser.add_argument("--pulse-key", default="InIcePulses")
     parser.add_argument("--pulse-mode", choices=["atwd", "fadc", "both"])
     parser.add_argument("--lc-mode", choices=["any", "lc", "nolc"], default="any")
+    parser.add_argument("--show-pulses", action="store_true", default=False)
     parser.add_argument("--atwd-only", action="store_true", default=True)
     parser.add_argument("--no-atwd-only", dest="atwd_only", action="store_false")
     parser.add_argument("--min-pulse-count", type=int)
@@ -181,6 +195,7 @@ if __name__ == "__main__":
         atwd_only=args.atwd_only,
         pulse_mode=args.pulse_mode,
         lc_mode=args.lc_mode,
+        include_pulses=args.show_pulses,
         min_pulse_count=args.min_pulse_count,
         max_pulse_count=args.max_pulse_count,
         min_total_charge=args.min_total_charge,
@@ -198,3 +213,10 @@ if __name__ == "__main__":
                 f"OM({om.string},{om.om}) count={stats['count']} "
                 f"total_charge={stats['total_charge']:.3f} max_charge={stats['max_charge']:.3f}"
             )
+            if args.show_pulses and "pulses" in stats:
+                for p in stats["pulses"]:
+                    width = p["width"]
+                    width_str = f"{width:.3f}" if isinstance(width, (int, float)) else "None"
+                    print(
+                        f"  t={p['time']:.3f} q={p['charge']:.3f} width={width_str}"
+                    )

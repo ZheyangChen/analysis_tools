@@ -3,6 +3,7 @@ from typing import Dict, Optional, Tuple, Literal, List, Any
 import numpy as np
 
 from icecube import dataclasses, dataio
+from analysis_tools.plotters.waveform_plot import load_geometry_and_calibration
 from icecube.icetray import I3Frame, OMKey
 
 
@@ -117,6 +118,8 @@ def find_doms_in_time_range_from_i3(
     pulse_mode: Optional[Literal["atwd", "fadc", "both"]] = None,
     lc_mode: Literal["any", "lc", "nolc"] = "any",
     include_pulses: bool = False,
+    gcd_mode: Literal["mc", "data"] = "data",
+    gcd_file: Optional[str] = None,
     min_pulse_count: Optional[int] = None,
     max_pulse_count: Optional[int] = None,
     min_total_charge: Optional[float] = None,
@@ -131,12 +134,16 @@ def find_doms_in_time_range_from_i3(
     i3_path + (run_id, event_id) to extract the physics frame.
     """
 
+    # Load calibration from GCD to satisfy I3RecoPulseSeriesMap.from_frame
+    _, cali, _ = load_geometry_and_calibration(i3_path, gcd_mode=gcd_mode, gcd_file=gcd_file)
+
     f = dataio.I3File(i3_path)
     phys = None
     while f.more():
         fr = f.pop_physics()
         hdr = fr["I3EventHeader"]
         if hdr.event_id == event_id and hdr.run_id == run_id:
+            fr.Put("I3Calibration", cali)
             phys = fr
             break
     f.close()
@@ -176,6 +183,8 @@ if __name__ == "__main__":
     parser.add_argument("--pulse-mode", choices=["atwd", "fadc", "both"])
     parser.add_argument("--lc-mode", choices=["any", "lc", "nolc"], default="any")
     parser.add_argument("--show-pulses", action="store_true", default=False)
+    parser.add_argument("--gcd-mode", choices=["mc", "data"], default="data")
+    parser.add_argument("--gcd-file")
     parser.add_argument("--atwd-only", action="store_true", default=True)
     parser.add_argument("--no-atwd-only", dest="atwd_only", action="store_false")
     parser.add_argument("--min-pulse-count", type=int)
@@ -196,6 +205,8 @@ if __name__ == "__main__":
         pulse_mode=args.pulse_mode,
         lc_mode=args.lc_mode,
         include_pulses=args.show_pulses,
+        gcd_mode=args.gcd_mode,
+        gcd_file=args.gcd_file,
         min_pulse_count=args.min_pulse_count,
         max_pulse_count=args.max_pulse_count,
         min_total_charge=args.min_total_charge,

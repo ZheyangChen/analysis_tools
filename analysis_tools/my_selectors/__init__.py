@@ -1,1 +1,1 @@
-from .dom_pulse_selection import find_doms_in_time_range
+from .dom_pulse_selection import find_doms_in_time_range, find_doms_in_time_range_from_i3

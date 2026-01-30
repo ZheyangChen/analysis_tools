@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Literal
 
 import numpy as np
 
@@ -12,6 +12,8 @@ def find_doms_in_time_range(
     pulse_key: str = "InIcePulses",
     time_range: Tuple[float, float],
     atwd_only: bool = True,
+    pulse_mode: Optional[Literal["atwd", "fadc", "both"]] = None,
+    lc_mode: Literal["any", "lc", "nolc"] = "any",
     min_pulse_count: Optional[int] = None,
     max_pulse_count: Optional[int] = None,
     min_total_charge: Optional[float] = None,
@@ -24,6 +26,7 @@ def find_doms_in_time_range(
 
     Selection can be done by pulse count, total charge, or max pulse charge
     within the time window. Any provided min/max constraint is applied.
+    If pulse_mode is provided, it overrides atwd_only.
 
     Returns a dict: OMKey -> {"count": int, "total_charge": float, "max_charge": float}
     """
@@ -31,6 +34,9 @@ def find_doms_in_time_range(
     t0, t1 = float(time_range[0]), float(time_range[1])
     if t1 < t0:
         t0, t1 = t1, t0
+
+    if pulse_mode is None:
+        pulse_mode = "atwd" if atwd_only else "both"
 
     pm = dataclasses.I3RecoPulseSeriesMap.from_frame(phys, pulse_key)
     out: Dict[OMKey, Dict[str, float]] = {}
@@ -42,7 +48,19 @@ def find_doms_in_time_range(
         ts = []
         qs = []
         for p in pulses:
-            if atwd_only and not (p.flags & dataclasses.I3RecoPulse.PulseFlags.ATWD):
+            flags = p.flags
+            if pulse_mode == "atwd" and not (flags & dataclasses.I3RecoPulse.PulseFlags.ATWD):
+                continue
+            if pulse_mode == "fadc" and not (flags & dataclasses.I3RecoPulse.PulseFlags.FADC):
+                continue
+            if pulse_mode == "both" and not (
+                (flags & dataclasses.I3RecoPulse.PulseFlags.ATWD)
+                or (flags & dataclasses.I3RecoPulse.PulseFlags.FADC)
+            ):
+                continue
+            if lc_mode == "lc" and not (flags & dataclasses.I3RecoPulse.PulseFlags.LC):
+                continue
+            if lc_mode == "nolc" and (flags & dataclasses.I3RecoPulse.PulseFlags.LC):
                 continue
             if t0 <= p.time <= t1:
                 ts.append(p.time)
@@ -85,6 +103,8 @@ def find_doms_in_time_range_from_i3(
     pulse_key: str = "InIcePulses",
     time_range: Tuple[float, float],
     atwd_only: bool = True,
+    pulse_mode: Optional[Literal["atwd", "fadc", "both"]] = None,
+    lc_mode: Literal["any", "lc", "nolc"] = "any",
     min_pulse_count: Optional[int] = None,
     max_pulse_count: Optional[int] = None,
     min_total_charge: Optional[float] = None,
@@ -119,6 +139,8 @@ def find_doms_in_time_range_from_i3(
         pulse_key=pulse_key,
         time_range=time_range,
         atwd_only=atwd_only,
+        pulse_mode=pulse_mode,
+        lc_mode=lc_mode,
         min_pulse_count=min_pulse_count,
         max_pulse_count=max_pulse_count,
         min_total_charge=min_total_charge,
@@ -138,6 +160,8 @@ if __name__ == "__main__":
     parser.add_argument("--t0", type=float, required=True)
     parser.add_argument("--t1", type=float, required=True)
     parser.add_argument("--pulse-key", default="InIcePulses")
+    parser.add_argument("--pulse-mode", choices=["atwd", "fadc", "both"])
+    parser.add_argument("--lc-mode", choices=["any", "lc", "nolc"], default="any")
     parser.add_argument("--atwd-only", action="store_true", default=True)
     parser.add_argument("--no-atwd-only", dest="atwd_only", action="store_false")
     parser.add_argument("--min-pulse-count", type=int)
@@ -155,6 +179,8 @@ if __name__ == "__main__":
         pulse_key=args.pulse_key,
         time_range=(args.t0, args.t1),
         atwd_only=args.atwd_only,
+        pulse_mode=args.pulse_mode,
+        lc_mode=args.lc_mode,
         min_pulse_count=args.min_pulse_count,
         max_pulse_count=args.max_pulse_count,
         min_total_charge=args.min_total_charge,

@@ -15,6 +15,28 @@ from icecube import dataio
 from icecube.icetray import I3Frame
 from icecube.dataclasses import I3Geometry, I3Calibration
 
+def _pulse_flag_match(
+    pulse: dataclasses.I3RecoPulse,
+    pulse_mode: Literal["atwd", "fadc", "both"],
+    lc_mode: Literal["any", "lc", "nolc"],
+) -> bool:
+    """Filter pulses by digitizer type and LC flag."""
+    flags = pulse.flags
+    if pulse_mode == "atwd" and not (flags & dataclasses.I3RecoPulse.PulseFlags.ATWD):
+        return False
+    if pulse_mode == "fadc" and not (flags & dataclasses.I3RecoPulse.PulseFlags.FADC):
+        return False
+    if pulse_mode == "both" and not (
+        (flags & dataclasses.I3RecoPulse.PulseFlags.ATWD)
+        or (flags & dataclasses.I3RecoPulse.PulseFlags.FADC)
+    ):
+        return False
+    if lc_mode == "lc" and not (flags & dataclasses.I3RecoPulse.PulseFlags.LC):
+        return False
+    if lc_mode == "nolc" and (flags & dataclasses.I3RecoPulse.PulseFlags.LC):
+        return False
+    return True
+
 def load_geometry_and_calibration(i3_path: str, gcd_mode: str = "mc", gcd_file: Optional[str] = None) -> Tuple[I3Geometry, I3Calibration, str]:
     """
     Returns (geo, cali, gcd_file). If no gcd_file is given, it will auto-detect:
@@ -65,6 +87,8 @@ def plot_event_pulses(
     run_id: Optional[int] = None,            # if provided, filter to this run
     event_id: Optional[int] = None,          # if provided, filter to this event (with run)
     pulse_key: str = "InIcePulses",
+    pulse_mode: Literal["atwd", "fadc", "both"] = "atwd",
+    lc_mode: Literal["any", "lc", "nolc"] = "any",
     string: Optional[int] = None,
     dom_range: Optional[Tuple[int,int]] = None,   # if None: auto from hits
     time_window: float = 500.0,
@@ -196,7 +220,7 @@ def plot_event_pulses(
             for dom in range(dom_lo, dom_hi):
                 om = OMKey(s, dom)
                 for p in pm.get(om, []):
-                    if p.flags & dataclasses.I3RecoPulse.PulseFlags.ATWD:
+                    if _pulse_flag_match(p, pulse_mode, lc_mode):
                         ts.append(p.time)
                         ds.append(dom)
                         ws.append(p.charge)
@@ -371,6 +395,8 @@ def plot_dom_pulses(
     run_id: Optional[int] = None,
     event_id: Optional[int] = None,
     pulse_key: str = "InIcePulses",
+    pulse_mode: Literal["atwd", "fadc", "both"] = "atwd",
+    lc_mode: Literal["any", "lc", "nolc"] = "any",
     string: Optional[int] = None,
     dom: Optional[int] = None,
     figsize: Tuple[float, float] = (8, 4),
@@ -490,10 +516,10 @@ def plot_dom_pulses(
                 print(f"No pulses on OM({omkey.string},{omkey.om})")
                 return
 
-            ts = [p.time   for p in pulses if (p.flags & dataclasses.I3RecoPulse.PulseFlags.ATWD)]
-            qs = [p.charge for p in pulses if (p.flags & dataclasses.I3RecoPulse.PulseFlags.ATWD)]
+            ts = [p.time for p in pulses if _pulse_flag_match(p, pulse_mode, lc_mode)]
+            qs = [p.charge for p in pulses if _pulse_flag_match(p, pulse_mode, lc_mode)]
             if not ts:
-                print(f"No ATWD pulses on OM({omkey.string},{omkey.om})")
+                print(f"No pulses matching selection on OM({omkey.string},{omkey.om})")
                 return
 
             arr_t = np.array(ts)

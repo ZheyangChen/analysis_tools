@@ -1,7 +1,7 @@
 import os
 import re
 import glob
-from typing import Optional, Union, Tuple, Literal
+from typing import Optional, Union, Tuple, Literal, Dict
 
 import numpy as np
 import pandas as pd
@@ -68,6 +68,8 @@ def plot_event_pulses(
     string: Optional[int] = None,
     dom_range: Optional[Tuple[int,int]] = None,   # if None: auto from hits
     time_window: float = 500.0,
+    time_range: Optional[Tuple[float, float]] = None,  # (t_start, t_end) overrides time_window
+    full_time_range: bool = False,  # if True, ignore time_window and use full pulse span
     time_anchor: str = "min",        # "min" | "quantile" | "peak"  (you already have this)
     anchor_quantile: float = 0.05,   # used when time_anchor="quantile"
     prepad_ns: float = 200.0, 
@@ -95,6 +97,7 @@ def plot_event_pulses(
     Automatically finds I3 files (via find_files_for_runs), loads GCD, and plots.
 
     If (run_id, event_id) are provided → plot only that event; otherwise iterate all rows.
+    Time range selection precedence: time_range > full_time_range > time_window.
     """
 
     # 1) Attach i3_path via your finder (must provide an 'i3_path' column)
@@ -214,8 +217,8 @@ def plot_event_pulses(
             # time bins (DOM bins = one per integer DOM)
             nt = bins if isinstance(bins, int) else int(bins[0])
         
-            def make_hist(t0_val: float, cmin_val: float):
-                xedges = np.linspace(t0_val, t0_val + time_window, nt + 1)
+            def make_hist(t0_val: float, cmin_val: float, window: float):
+                xedges = np.linspace(t0_val, t0_val + window, nt + 1)
                 yedges = np.arange(dr0, dr1 + 1)
                 counts, _, _ = np.histogram2d(arr_t, arr_d, bins=[xedges, yedges], weights=arr_w)
                 masked = np.ma.masked_where(counts <= cmin_val, counts)
@@ -234,14 +237,25 @@ def plot_event_pulses(
                     return Normalize(vmin=vmin, vmax=vmax)
         
             # --- choose t0 with prepad ---
-            t0 = arr_t.min() - prepad_ns
-            masked, xedges, yedges = make_hist(t0, cmin)
+            # time range selection: explicit > full span > default window
+            if time_range is not None:
+                t_start, t_end = float(time_range[0]), float(time_range[1])
+                t0 = t_start
+                tw = max(0.0, t_end - t_start)
+            elif full_time_range:
+                t0 = float(arr_t.min())
+                tw = float(arr_t.max()) - float(arr_t.min())
+            else:
+                t0 = float(arr_t.min()) - prepad_ns
+                tw = float(time_window)
+
+            masked, xedges, yedges = make_hist(t0, cmin, tw)
             norm_obj = pick_norm(masked)
         
             # Fallbacks same as before
             if norm_obj is None:
                 t0_q = np.quantile(arr_t, 0.05) - prepad_ns
-                masked, xedges, yedges = make_hist(t0_q, cmin)
+                masked, xedges, yedges = make_hist(t0_q, cmin, tw)
                 norm_obj = pick_norm(masked)
         
             if norm_obj is None and arr_t.ptp() > 0:
@@ -254,12 +268,12 @@ def plot_event_pulses(
                 cs = np.cumsum(np.r_[0, hist])
                 win_sums = cs[k:] - cs[:-k]
                 j = int(np.argmax(win_sums)) if win_sums.size else 0
-                t0_peak = edges[j] - prepad
-                masked, xedges, yedges = make_hist(t0_peak, cmin)
+                t0_peak = edges[j] - prepad_ns
+                masked, xedges, yedges = make_hist(t0_peak, cmin, tw)
                 norm_obj = pick_norm(masked)
         
             if norm_obj is None and cmin > 0:
-                masked, xedges, yedges = make_hist(arr_t.min() - prepad, max(0.0, cmin * 0.1))
+                masked, xedges, yedges = make_hist(arr_t.min() - prepad_ns, max(0.0, cmin * 0.1), tw)
                 norm_obj = pick_norm(masked)
         
             if norm_obj is None:
@@ -371,6 +385,8 @@ def plot_dom_pulses(
     xlim: Optional[Tuple[float, float]] = None,
     ylim: Optional[Tuple[float, float]] = None,
     time_window: Optional[float] = None, 
+    time_range: Optional[Tuple[float, float]] = None,  # (t_start, t_end) overrides time_window
+    full_time_range: bool = False,  # if True, ignore time_window and use full pulse span
     dom_selection: Literal["bright", "nearest"] = "bright",
     vertex_key: str = "cscdSBU_MonopodFit4_noDC",
     nearest_dom_count: int = 10,
@@ -379,6 +395,7 @@ def plot_dom_pulses(
     Make per-DOM pulse plots (charge vs time) for events listed in a DataFrame.
     If time_window is provided (and xlim is not), x-axis will be
     [first_pulse_time, first_pulse_time + time_window].
+    Time range selection precedence: time_range > full_time_range > time_window.
     """
 
     # Resolve I3 file paths
@@ -507,9 +524,14 @@ def plot_dom_pulses(
             fig, ax = plt.subplots(figsize=figsize)
             ax.plot(arr_t, arr_q, linestyle='-', lw=1)
             
-            # x-limits priority: explicit xlim > time_window > full data span
+            # x-limits priority: explicit xlim > time_range > full_time_range > time_window > full data span
             if xlim is not None:
                 ax.set_xlim(*xlim)
+            elif time_range is not None:
+                t_start, t_end = float(time_range[0]), float(time_range[1])
+                ax.set_xlim(t_start, t_end)
+            elif full_time_range:
+                ax.set_xlim(float(arr_t.min()), float(arr_t.max()))
             elif time_window is not None and time_window > 0:
                 t0 = float(arr_t.min())
                 ax.set_xlim(t0, t0 + float(time_window))

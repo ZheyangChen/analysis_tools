@@ -1,14 +1,13 @@
-from typing import Dict, Optional, Tuple, Literal, List, Any
+from typing import Dict, Optional, Tuple, Literal, List, Any, TYPE_CHECKING
 
 import numpy as np
 
-from icecube import dataclasses, dataio
-from analysis_tools.plotters.waveform_plot import load_geometry_and_calibration
-from icecube.icetray import I3Frame, OMKey
+if TYPE_CHECKING:
+    from icecube.icetray import I3Frame, OMKey
 
 
 def find_doms_in_time_range(
-    phys: I3Frame,
+    phys: "I3Frame",
     *,
     pulse_key: str = "InIcePulses",
     time_range: Tuple[float, float],
@@ -22,7 +21,7 @@ def find_doms_in_time_range(
     max_total_charge: Optional[float] = None,
     min_max_pulse_charge: Optional[float] = None,
     max_max_pulse_charge: Optional[float] = None,
-) -> Dict[OMKey, Dict[str, Any]]:
+) -> Dict["OMKey", Dict[str, Any]]:
     """
     Find DOMs with pulses in a custom time range.
 
@@ -41,8 +40,10 @@ def find_doms_in_time_range(
     if pulse_mode is None:
         pulse_mode = "atwd" if atwd_only else "both"
 
+    from icecube import dataclasses
+
     pm = dataclasses.I3RecoPulseSeriesMap.from_frame(phys, pulse_key)
-    out: Dict[OMKey, Dict[str, float]] = {}
+    out: Dict["OMKey", Dict[str, Any]] = {}
 
     for om, pulses in pm.items():
         if not pulses:
@@ -126,13 +127,16 @@ def find_doms_in_time_range_from_i3(
     max_total_charge: Optional[float] = None,
     min_max_pulse_charge: Optional[float] = None,
     max_max_pulse_charge: Optional[float] = None,
-) -> Dict[OMKey, Dict[str, float]]:
+) -> Dict["OMKey", Dict[str, Any]]:
     """
     Load an I3 file, find the target physics frame, and select DOMs in a time range.
 
     Note: GCD is not required for pulse-only selection, so this loader only uses
     i3_path + (run_id, event_id) to extract the physics frame.
     """
+
+    from icecube import dataio
+    from analysis_tools.plotters.waveform_plot import load_geometry_and_calibration
 
     # Load calibration from GCD to satisfy I3RecoPulseSeriesMap.from_frame
     _, cali, _ = load_geometry_and_calibration(i3_path, gcd_mode=gcd_mode, gcd_file=gcd_file)

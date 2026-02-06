@@ -14,14 +14,15 @@ def overlay_vertex_on_dom_plot(
     pulse_key: str = "InIcePulses",
     gcd_mode: str = "data",
     gcd_file: str = None,
-    color: str = "red",
+    colors: Optional[Sequence[str]] = None,
     marker: str = "x",
     ms: int = 10,
     ice_index: float = 1.4,
     show_arrival_markers: bool = False,
     arrival_dom_list: Optional[Sequence[int]] = None,
-    arrival_marker: str = "x",
+    arrival_marker: str = "o",
     arrival_ms: int = 6,
+    arrival_label_prefix: str = "arrival_",
 ):
     """
     Overlay reconstructed vertex positions on an existing DOM pulse plot.
@@ -87,7 +88,11 @@ def overlay_vertex_on_dom_plot(
     # -------------------------
     # Loop over vertices
     # -------------------------
-    for key in vertex_keys:
+    color_list = list(colors) if colors is not None else []
+    if not color_list:
+        color_list = ["red"]
+
+    for idx, key in enumerate(vertex_keys):
         if key not in phys:
             print(f"[skip] vertex '{key}' not in frame")
             continue
@@ -126,13 +131,15 @@ def overlay_vertex_on_dom_plot(
         dom_z_map.sort()
         dom_vertex = dom_z_map[0][1]
 
+        plot_color = color_list[idx % len(color_list)]
+
         # -------------------------
         # Overlay vertex marker
         # -------------------------
         ax.scatter(
             t0,
             dom_vertex,
-            color=color,
+            color=plot_color,
             marker=marker,
             s=ms**2,
             zorder=10,
@@ -198,11 +205,11 @@ def overlay_vertex_on_dom_plot(
                 dx, dy, dz = pos.x - x0, pos.y - y0, pos.z - z0
                 dist = (dx * dx + dy * dy + dz * dz) ** 0.5
                 t_expected = t0 + dist / c_ice
-                label = key if not labeled else None
+                label = f"{arrival_label_prefix}{key}" if not labeled else None
                 ax.scatter(
                     t_expected,
                     dom,
-                    color=color,
+                    color=plot_color,
                     marker=arrival_marker,
                     s=arrival_ms ** 2,
                     zorder=9,

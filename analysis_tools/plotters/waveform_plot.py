@@ -108,7 +108,7 @@ def plot_event_pulses(
     ylabel: str = "DOM",
     title: Optional[str] = None,
     colorbar_label: str = "Charge [p.e.]",
-    invert_dom_axis: bool = False,
+    invert_dom_axis: bool = True,
     show: bool = True,
     save_dir: Optional[str] = None,
     gcd_mode: Literal["mc","data"] = "mc",

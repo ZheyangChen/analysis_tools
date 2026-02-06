@@ -18,6 +18,10 @@ def overlay_vertex_on_dom_plot(
     marker: str = "x",
     ms: int = 10,
     ice_index: float = 1.4,
+    show_arrival_markers: bool = False,
+    arrival_dom_list: Optional[Sequence[int]] = None,
+    arrival_marker: str = "x",
+    arrival_ms: int = 6,
 ):
     """
     Overlay reconstructed vertex positions on an existing DOM pulse plot.
@@ -123,7 +127,7 @@ def overlay_vertex_on_dom_plot(
         dom_vertex = dom_z_map[0][1]
 
         # -------------------------
-        # Overlay marker
+        # Overlay vertex marker
         # -------------------------
         ax.scatter(
             t0,
@@ -159,7 +163,7 @@ def overlay_vertex_on_dom_plot(
             for d2, om, pos in dist_om_pairs[:5]:
                 d = np.sqrt(d2)
                 t_flight = d / c_ice  # ns
-        
+
                 if t0 is not None:
                     t_expected = t0 + t_flight
                     time_str = (
@@ -176,5 +180,34 @@ def overlay_vertex_on_dom_plot(
                 )
         else:
             print("    [warn] no pulses for nearest-DOM search")
+
+        # -------------------------
+        # Arrival markers per DOM
+        # -------------------------
+        if show_arrival_markers:
+            doms_for_marker = list(range(dom_lo, dom_hi))
+            if arrival_dom_list is not None:
+                doms_for_marker = [d for d in doms_for_marker if d in arrival_dom_list]
+
+            labeled = False
+            for dom in doms_for_marker:
+                om = OMKey(string, dom)
+                if om not in geo.omgeo:
+                    continue
+                pos = geo.omgeo[om].position
+                dx, dy, dz = pos.x - x0, pos.y - y0, pos.z - z0
+                dist = (dx * dx + dy * dy + dz * dz) ** 0.5
+                t_expected = t0 + dist / c_ice
+                label = key if not labeled else None
+                ax.scatter(
+                    t_expected,
+                    dom,
+                    color=color,
+                    marker=arrival_marker,
+                    s=arrival_ms ** 2,
+                    zorder=9,
+                    label=label,
+                )
+                labeled = True
 
     ax.legend(loc="best")

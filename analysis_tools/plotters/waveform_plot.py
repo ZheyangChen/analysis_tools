@@ -1,7 +1,7 @@
 import os
 import re
 import glob
-from typing import Optional, Union, Tuple, Literal, Dict
+from typing import Optional, Union, Tuple, Literal, Dict, Sequence
 
 import numpy as np
 import pandas as pd
@@ -90,6 +90,7 @@ def plot_event_pulses(
     pulse_mode: Literal["atwd", "fadc", "both"] = "atwd",
     lc_mode: Literal["any", "lc", "nolc"] = "any",
     string: Optional[int] = None,
+    exclude_doms: Optional[Sequence[int]] = None,
     dom_range: Optional[Tuple[int,int]] = None,   # if None: auto from hits
     time_window: float = 500.0,
     time_range: Optional[Tuple[float, float]] = None,  # (t_start, t_end) overrides time_window
@@ -107,6 +108,15 @@ def plot_event_pulses(
     ylabel: str = "DOM",
     title: Optional[str] = None,
     colorbar_label: str = "Charge [p.e.]",
+    invert_dom_axis: bool = False,
+    show_arrival_markers: bool = False,
+    arrival_vertex_keys: Optional[Sequence[str]] = None,
+    arrival_dom_list: Optional[Sequence[int]] = None,
+    arrival_color: str = "red",
+    arrival_colors: Optional[Sequence[str]] = None,
+    arrival_marker: str = "x",
+    arrival_ms: int = 6,
+    arrival_ice_index: float = 1.4,
     show: bool = True,
     save_dir: Optional[str] = None,
     gcd_mode: Literal["mc","data"] = "mc",
@@ -212,12 +222,15 @@ def plot_event_pulses(
         ):
             pm = dataclasses.I3RecoPulseSeriesMap.from_frame(phys, pulse_key)
             ts, ds, ws = [], [], []
+            exclude_set = set(exclude_doms or [])
         
             # Iterate DOMs: auto all (0..59) or user range
             dom_lo = 0 if dr is None else dr[0]
             dom_hi = 60 if dr is None else dr[1]
         
             for dom in range(dom_lo, dom_hi):
+                if dom in exclude_set:
+                    continue
                 om = OMKey(s, dom)
                 for p in pm.get(om, []):
                     if _pulse_flag_match(p, pulse_mode, lc_mode):
@@ -313,6 +326,55 @@ def plot_event_pulses(
             ax.set_xlabel(xlabel)
             ax.set_ylabel(ylabel)
             ax.set_title(title or f"Run {rid}  Event {eid}  String {s}")
+            if invert_dom_axis:
+                ax.invert_yaxis()
+
+            if show_arrival_markers and arrival_vertex_keys:
+                c_ice = 0.2998 / float(arrival_ice_index)
+                if arrival_colors is None:
+                    colors = [arrival_color] * len(arrival_vertex_keys)
+                else:
+                    colors = list(arrival_colors)
+                    if not colors:
+                        colors = [arrival_color]
+                labeled = set()
+                for idx, key in enumerate(arrival_vertex_keys):
+                    if key not in phys:
+                        print(f"[skip] vertex '{key}' not in frame")
+                        continue
+                    v = phys[key]
+                    if not hasattr(v, "pos") or not hasattr(v, "time"):
+                        print(f"[skip] vertex '{key}' has no pos/time")
+                        continue
+                    x0, y0, z0 = v.pos.x, v.pos.y, v.pos.z
+                    t0 = v.time
+                    color = colors[idx % len(colors)] if colors else arrival_color
+
+                    doms_for_marker = list(range(dom_lo, dom_hi))
+                    if arrival_dom_list is not None:
+                        doms_for_marker = [d for d in doms_for_marker if d in arrival_dom_list]
+                    if exclude_set:
+                        doms_for_marker = [d for d in doms_for_marker if d not in exclude_set]
+
+                    for dom in doms_for_marker:
+                        om = OMKey(s, dom)
+                        if om not in geo.omgeo:
+                            continue
+                        pos = geo.omgeo[om].position
+                        dx, dy, dz = pos.x - x0, pos.y - y0, pos.z - z0
+                        dist = (dx * dx + dy * dy + dz * dz) ** 0.5
+                        t_expected = t0 + dist / c_ice
+                        label = key if key not in labeled else None
+                        ax.scatter(
+                            t_expected,
+                            dom,
+                            color=color,
+                            marker=arrival_marker,
+                            s=arrival_ms ** 2,
+                            zorder=9,
+                            label=label,
+                        )
+                        labeled.add(key)
             fig.tight_layout()
             if save_dir:
                 os.makedirs(save_dir, exist_ok=True)

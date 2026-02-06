@@ -248,7 +248,8 @@ def plot_event_pulses(
         
             def make_hist(t0_val: float, cmin_val: float, window: float):
                 xedges = np.linspace(t0_val, t0_val + window, nt + 1)
-                yedges = np.arange(dr0, dr1 + 1)
+                # Center bins on integer DOM indices (e.g., DOM 2 centered at y=2)
+                yedges = np.arange(dr0 - 0.5, dr1 + 0.5, 1.0)
                 counts, _, _ = np.histogram2d(arr_t, arr_d, bins=[xedges, yedges], weights=arr_w)
                 masked = np.ma.masked_where(counts <= cmin_val, counts)
                 return masked, xedges, yedges
